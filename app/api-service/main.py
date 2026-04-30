@@ -1,6 +1,12 @@
 """
 API Service — eks-gitops-platform
-FastAPI application with full type safety for EKS/GitOps demo.
+FastAPI application that:
+  - Exposes GET /health  (returns pod hostname + AZ — proves Multi-AZ)
+  - Exposes GET /items   (reads from DynamoDB)
+  - Exposes POST /items  (writes to DynamoDB + publishes to SQS)
+  - Exposes GET /metrics (Prometheus-compatible via prometheus_fastapi_instrumentator)
+
+All AWS credentials come from IRSA (IAM Roles for Service Accounts).
 """
 
 import json
@@ -18,7 +24,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
-# Logging
+# Logging — JSON structured for CloudWatch Logs Insights
 # ---------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
@@ -27,7 +33,7 @@ logging.basicConfig(
 logger = logging.getLogger("api-service")
 
 # ---------------------------------------------------------------------------
-# Configuration
+# Configuration from environment
 # ---------------------------------------------------------------------------
 AWS_REGION       = os.environ.get("AWS_REGION", "us-east-1")
 SQS_QUEUE_URL    = os.environ["SQS_QUEUE_URL"]
@@ -35,17 +41,22 @@ DYNAMODB_TABLE   = os.environ["DYNAMODB_TABLE"]
 ENVIRONMENT      = os.environ.get("ENVIRONMENT", "prod")
 SERVICE_VERSION   = os.environ.get("SERVICE_VERSION", "unknown")
 
+# ---------------------------------------------------------------------------
+# AWS Clients
+# ---------------------------------------------------------------------------
 sqs      = boto3.client("sqs",      region_name=AWS_REGION)
 dynamodb = boto3.resource("dynamodb", region_name=AWS_REGION)
 table    = dynamodb.Table(DYNAMODB_TABLE)
 
 # ---------------------------------------------------------------------------
-# App Init
+# App Initialization
 # ---------------------------------------------------------------------------
 app = FastAPI(
     title="EKS GitOps API Service",
+    description="Production-grade FastAPI service running on EKS with IRSA",
     version=SERVICE_VERSION,
     docs_url="/docs" if ENVIRONMENT != "prod" else None,
+    redoc_url=None,
 )
 
 app.add_middleware(
@@ -55,11 +66,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Prometheus metrics
 Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
+
 class ItemCreate(BaseModel):
     name:        str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = Field(None, max_length=1000)
@@ -84,8 +97,10 @@ class HealthResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
 @app.get("/health", response_model=HealthResponse, tags=["ops"])
 async def health():
+    """Health check endpoint proving Multi-AZ via env var or IMDSv2."""
     return {
         "status":            "healthy",
         "hostname":          socket.gethostname(),
@@ -97,6 +112,7 @@ async def health():
 
 @app.get("/items", response_model=List[ItemResponse], tags=["items"])
 async def list_items(status_filter: Optional[str] = None, limit: int = 20):
+    """List items from DynamoDB with explicit type casting for mypy."""
     try:
         if status_filter:
             response = table.query(
@@ -110,15 +126,14 @@ async def list_items(status_filter: Optional[str] = None, limit: int = 20):
             response = table.scan(Limit=limit)
 
         items = response.get("Items", [])
-        # Correctly looping through the items list
         return [
             ItemResponse(
-                id=str(item["id"]),
-                name=str(item["name"]),
-                description=item.get("description"),
+                id=str(item.get("id", "")),
+                name=str(item.get("name", "")),
+                description=str(item["description"]) if item.get("description") is not None else None,
                 priority=int(item.get("priority", 1)),
-                status=str(item["status"]),
-                created_at=str(item["created_at"]),
+                status=str(item.get("status", "")),
+                created_at=str(item.get("created_at", ""))
             )
             for item in items
         ]
@@ -128,6 +143,7 @@ async def list_items(status_filter: Optional[str] = None, limit: int = 20):
 
 @app.get("/items/{item_id}", response_model=ItemResponse, tags=["items"])
 async def get_item(item_id: str):
+    """Get a single item with explicit type casting."""
     try:
         response = table.scan(
             FilterExpression="id = :id",
@@ -140,19 +156,22 @@ async def get_item(item_id: str):
         
         item = items[0]
         return ItemResponse(
-            id=str(item["id"]),
-            name=str(item["name"]),
-            description=item.get("description"),
+            id=str(item.get("id", "")),
+            name=str(item.get("name", "")),
+            description=str(item["description"]) if item.get("description") is not None else None,
             priority=int(item.get("priority", 1)),
-            status=str(item["status"]),
-            created_at=str(item["created_at"]),
+            status=str(item.get("status", "")),
+            created_at=str(item.get("created_at", ""))
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error("Failed to get item: %s", str(e))
-        raise HTTPException(status_code=500, detail="Error fetching item")
+        logger.error("Failed to get item %s: %s", item_id, str(e))
+        raise HTTPException(status_code=500, detail="Failed to retrieve item")
 
 @app.post("/items", response_model=ItemResponse, status_code=status.HTTP_201_CREATED, tags=["items"])
 async def create_item(item: ItemCreate):
+    """Create item and publish to SQS."""
     item_id    = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
 
@@ -167,23 +186,64 @@ async def create_item(item: ItemCreate):
 
     try:
         table.put_item(Item=db_item)
+        logger.info("Created item %s in DynamoDB", item_id)
+    except Exception as e:
+        logger.error("DynamoDB put_item failed: %s", str(e))
+        raise HTTPException(status_code=500, detail="Failed to persist item")
+
+    try:
         sqs.send_message(
             QueueUrl=SQS_QUEUE_URL,
-            MessageBody=json.dumps({"item_id": item_id, "action": "process_item"}),
+            MessageBody=json.dumps({
+                "item_id":    item_id,
+                "name":       item.name,
+                "priority":   item.priority,
+                "created_at": created_at,
+                "action":     "process_item",
+            }),
+            MessageAttributes={
+                "priority": {
+                    "StringValue": str(item.priority),
+                    "DataType": "Number",
+                }
+            },
         )
-        return ItemResponse(
-            id=str(db_item["id"]),
-            name=str(db_item["name"]),
-            description=db_item.get("description"),
-            priority=int(db_item.get("priority", 1)),
-            status=str(db_item["status"]),
-            created_at=str(db_item["created_at"])
-        )
+        logger.info("Published item %s to SQS", item_id)
     except Exception as e:
-        logger.error("Create failed: %s", str(e))
-        raise HTTPException(status_code=500, detail="Failed to create item")
+        logger.warning("SQS publish failed for item %s: %s", item_id, str(e))
+
+    return ItemResponse(
+        id=str(db_item.get("id", "")),
+        name=str(db_item.get("name", "")),
+        description=str(db_item["description"]) if db_item.get("description") is not None else None,
+        priority=int(db_item.get("priority", 1)),
+        status=str(db_item.get("status", "")),
+        created_at=str(db_item.get("created_at", ""))
+    )
 
 @app.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["items"])
 async def delete_item(item_id: str):
-    # Simplified delete for demo
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    """Soft-delete via status update."""
+    try:
+        response = table.scan(
+            FilterExpression="id = :id",
+            ExpressionAttributeValues={":id": item_id},
+            Limit=1,
+        )
+        items = response.get("Items", [])
+        if not items:
+            raise HTTPException(status_code=404, detail=f"Item {item_id} not found")
+
+        item = items[0]
+        table.update_item(
+            Key={"id": item["id"], "created_at": item["created_at"]},
+            UpdateExpression="SET #s = :s",
+            ExpressionAttributeNames={"#s": "status"},
+            ExpressionAttributeValues={":s": "deleted"},
+        )
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to delete item %s: %s", item_id, str(e))
+        raise HTTPException(status_code=500, detail="Failed to delete item")
