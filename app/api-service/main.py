@@ -131,7 +131,7 @@ async def list_items(status_filter: Optional[str] = None, limit: int = 20):
                 id=str(item.get("id", "")),
                 name=str(item.get("name", "")),
                 description=str(item["description"]) if item.get("description") is not None else None,
-                priority=int(item.get("priority", 1)),
+                priority=int(str(item.get("priority", 1))),
                 status=str(item.get("status", "")),
                 created_at=str(item.get("created_at", ""))
             )
@@ -159,7 +159,7 @@ async def get_item(item_id: str):
             id=str(item.get("id", "")),
             name=str(item.get("name", "")),
             description=str(item["description"]) if item.get("description") is not None else None,
-            priority=int(item.get("priority", 1)),
+            priority=int(str(item.get("priority", 1))),
             status=str(item.get("status", "")),
             created_at=str(item.get("created_at", ""))
         )
@@ -216,7 +216,7 @@ async def create_item(item: ItemCreate):
         id=str(db_item.get("id", "")),
         name=str(db_item.get("name", "")),
         description=str(db_item["description"]) if db_item.get("description") is not None else None,
-        priority=int(db_item.get("priority", 1)),
+        priority=int(str(db_item.get("priority", 1))),
         status=str(db_item.get("status", "")),
         created_at=str(db_item.get("created_at", ""))
     )
