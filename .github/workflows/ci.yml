@@ -1,0 +1,398 @@
+# ---------------------------------------------------------------------------
+# .github/workflows/ci.yml
+#
+# CI pipeline — runs on every push to main and on PRs targeting main.
+#
+# What it does:
+#   1. Detects which service changed (api-service or worker-service or both)
+#   2. Runs Python tests for changed services
+#   3. Builds Docker image and pushes to ECR (main branch only)
+#   4. Updates the image tag in the Helm chart values.yaml
+#   5. Commits the tag update back to main → ArgoCD detects the diff → deploys
+#
+# Authentication: OIDC (no static AWS keys stored in GitHub Secrets).
+# The AWS role is assumed via the GitHub OIDC provider registered in Terraform.
+# ---------------------------------------------------------------------------
+
+name: CI — Build, Test, Push, Update Helm Tag
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "app/**"
+      - "helm-charts/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "app/**"
+      - "helm-charts/**"
+
+# Cancel in-progress runs on the same branch to avoid wasted compute
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION:      us-east-1
+  # Replace with your actual AWS account ID
+  AWS_ACCOUNT_ID:  "123456789012"
+  ECR_API_REPO:    eks-gitops/api-service
+  ECR_WORKER_REPO: eks-gitops/worker-service
+  PYTHON_VERSION:  "3.12"
+
+permissions:
+  id-token: write   # Required for OIDC token exchange
+  contents: write   # Required to push Helm tag update commits
+  pull-requests: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: detect which services changed
+  # ---------------------------------------------------------------------------
+  detect-changes:
+    name: Detect Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      api_service:    ${{ steps.changes.outputs.api_service }}
+      worker_service: ${{ steps.changes.outputs.worker_service }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Need at least 2 commits to detect diffs
+
+      - name: Detect changed paths
+        id: changes
+        run: |
+          # On push to main, diff against previous commit
+          # On PR, diff against base branch
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_SHA="HEAD~1"
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE_SHA" HEAD)
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          if echo "$CHANGED" | grep -qE "^app/api-service/|^helm-charts/api-service/"; then
+            echo "api_service=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "api_service=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if echo "$CHANGED" | grep -qE "^app/worker-service/|^helm-charts/worker-service/"; then
+            echo "worker_service=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "worker_service=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Job 2: test API service
+  # ---------------------------------------------------------------------------
+  test-api-service:
+    name: Test — API Service
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.api_service == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: app/api-service/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          cd app/api-service
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx pytest-cov
+
+      - name: Run tests
+        run: |
+          cd app/api-service
+          pytest tests/ \
+            --cov=main \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=80 \
+            -v
+        env:
+          # Mock environment variables for tests
+          SQS_QUEUE_URL:  "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue"
+          DYNAMODB_TABLE: "test-items"
+          AWS_REGION:     "us-east-1"
+          ENVIRONMENT:    "test"
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: app/api-service/coverage.xml
+          flags: api-service
+
+  # ---------------------------------------------------------------------------
+  # Job 3: test worker service
+  # ---------------------------------------------------------------------------
+  test-worker-service:
+    name: Test — Worker Service
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.worker_service == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: app/worker-service/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          cd app/worker-service
+          pip install -r requirements.txt
+          pip install pytest pytest-cov moto[sqs,dynamodb]
+
+      - name: Run tests
+        run: |
+          cd app/worker-service
+          pytest tests/ \
+            --cov=main \
+            --cov-report=term-missing \
+            --cov-fail-under=80 \
+            -v
+        env:
+          SQS_QUEUE_URL:  "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue"
+          DYNAMODB_TABLE: "test-items"
+          AWS_REGION:     "us-east-1"
+          ENVIRONMENT:    "test"
+
+  # ---------------------------------------------------------------------------
+  # Job 4: build and push API service image to ECR
+  # Runs only on push to main, after tests pass
+  # ---------------------------------------------------------------------------
+  build-push-api-service:
+    name: Build & Push — API Service
+    runs-on: ubuntu-latest
+    needs: [detect-changes, test-api-service]
+    if: |
+      github.ref == 'refs/heads/main' &&
+      needs.detect-changes.outputs.api_service == 'true'
+    outputs:
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-eks-gitops
+          aws-region: ${{ env.AWS_REGION }}
+          # Token lasts 1 hour — enough for a full build+push cycle
+          role-session-name: github-ci-api-service-${{ github.run_id }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Generate image metadata
+        id: meta
+        run: |
+          # Tag format: prod-<short-sha>-<run-number>
+          # Short SHA ensures traceability; run number ensures uniqueness
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
+          IMAGE_TAG="prod-${SHORT_SHA}-${{ github.run_number }}"
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Image tag: ${IMAGE_TAG}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push API service
+        uses: docker/build-push-action@v5
+        with:
+          context: app/api-service
+          file: app/api-service/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_API_REPO }}:${{ steps.meta.outputs.image_tag }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_API_REPO }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false  # Reduces image manifest complexity for ECR
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_API_REPO }}:${{ steps.meta.outputs.image_tag }}
+          format: table
+          exit-code: 1           # Fail the pipeline on CRITICAL vulnerabilities
+          ignore-unfixed: true
+          severity: CRITICAL
+
+  # ---------------------------------------------------------------------------
+  # Job 5: build and push worker service image to ECR
+  # ---------------------------------------------------------------------------
+  build-push-worker-service:
+    name: Build & Push — Worker Service
+    runs-on: ubuntu-latest
+    needs: [detect-changes, test-worker-service]
+    if: |
+      github.ref == 'refs/heads/main' &&
+      needs.detect-changes.outputs.worker_service == 'true'
+    outputs:
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-eks-gitops
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-ci-worker-service-${{ github.run_id }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Generate image metadata
+        id: meta
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
+          IMAGE_TAG="prod-${SHORT_SHA}-${{ github.run_number }}"
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push worker service
+        uses: docker/build-push-action@v5
+        with:
+          context: app/worker-service
+          file: app/worker-service/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_WORKER_REPO }}:${{ steps.meta.outputs.image_tag }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_WORKER_REPO }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_WORKER_REPO }}:${{ steps.meta.outputs.image_tag }}
+          format: table
+          exit-code: 1
+          ignore-unfixed: true
+          severity: CRITICAL
+
+  # ---------------------------------------------------------------------------
+  # Job 6: update Helm chart image tags — triggers ArgoCD GitOps sync
+  #
+  # This is the GitOps trigger. When we update values.yaml with the new image
+  # tag and push to main, ArgoCD detects the diff and applies the new
+  # Helm release. No kubectl. No manual deploy. Git IS the source of truth.
+  # ---------------------------------------------------------------------------
+  update-helm-tags:
+    name: Update Helm Image Tags (GitOps Trigger)
+    runs-on: ubuntu-latest
+    needs: [build-push-api-service, build-push-worker-service]
+    # Run even if only one service was built — 'always()' with null-checks below
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      (needs.build-push-api-service.result == 'success' || needs.build-push-worker-service.result == 'success')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # Fetch full history so we can push cleanly
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Update API service image tag
+        if: needs.build-push-api-service.result == 'success'
+        env:
+          IMAGE_TAG: ${{ needs.build-push-api-service.outputs.image_tag }}
+          AWS_ACCOUNT_ID: ${{ env.AWS_ACCOUNT_ID }}
+        run: |
+          VALUES_FILE="helm-charts/api-service/values.yaml"
+
+          # Update image.tag
+          sed -i "s|^  tag: .*|  tag: \"${IMAGE_TAG}\"|" "$VALUES_FILE"
+
+          # Update image.repository (in case it was placeholder)
+          ECR_URL="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_API_REPO}"
+          sed -i "s|^  repository: .*|  repository: \"${ECR_URL}\"|" "$VALUES_FILE"
+
+          echo "Updated api-service values.yaml → tag: ${IMAGE_TAG}"
+          grep -A2 "^image:" "$VALUES_FILE"
+
+      - name: Update worker service image tag
+        if: needs.build-push-worker-service.result == 'success'
+        env:
+          IMAGE_TAG: ${{ needs.build-push-worker-service.outputs.image_tag }}
+          AWS_ACCOUNT_ID: ${{ env.AWS_ACCOUNT_ID }}
+        run: |
+          VALUES_FILE="helm-charts/worker-service/values.yaml"
+
+          sed -i "s|^  tag: .*|  tag: \"${IMAGE_TAG}\"|" "$VALUES_FILE"
+
+          ECR_URL="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_WORKER_REPO}"
+          sed -i "s|^  repository: .*|  repository: \"${ECR_URL}\"|" "$VALUES_FILE"
+
+          echo "Updated worker-service values.yaml → tag: ${IMAGE_TAG}"
+          grep -A2 "^image:" "$VALUES_FILE"
+
+      - name: Commit and push Helm tag updates
+        run: |
+          git add helm-charts/api-service/values.yaml helm-charts/worker-service/values.yaml
+
+          # Only commit if there are actual changes
+          if git diff --staged --quiet; then
+            echo "No Helm values changed — skipping commit"
+            exit 0
+          fi
+
+          API_TAG="${{ needs.build-push-api-service.outputs.image_tag }}"
+          WORKER_TAG="${{ needs.build-push-worker-service.outputs.image_tag }}"
+          COMMIT_MSG="chore(gitops): update image tags [skip ci]
+
+          api-service:    ${API_TAG:-unchanged}
+          worker-service: ${WORKER_TAG:-unchanged}
+
+          Triggered by: ${{ github.sha }}
+          Run: ${{ github.run_id }}"
+
+          git commit -m "$COMMIT_MSG"
+
+          # Push — ArgoCD will detect this commit and trigger a sync
+          git push origin main
+
+          echo "✅ Helm tags updated and pushed — ArgoCD sync will begin shortly"

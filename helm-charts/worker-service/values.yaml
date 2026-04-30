@@ -1,0 +1,80 @@
+# ---------------------------------------------------------------------------
+# worker-service/values.yaml
+# ---------------------------------------------------------------------------
+
+replicaCount: 1  # KEDA manages this — starts at 0 when queue is empty
+
+image:
+  repository: ""    # Injected: <account>.dkr.ecr.<region>.amazonaws.com/eks-gitops/worker-service
+  tag: "latest"     # Updated by CI on every merge to main
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: "worker-service"
+
+serviceAccount:
+  create: true
+  name: "worker-service"
+  annotations:
+    eks.amazonaws.com/role-arn: ""  # Injected via ArgoCD helm values
+
+env:
+  ENVIRONMENT: "prod"
+  AWS_REGION: "us-east-1"
+  SQS_QUEUE_URL: ""       # Injected from Terraform output
+  DYNAMODB_TABLE: ""      # Injected from Terraform output
+  POLL_WAIT_SECONDS: "20"
+  MAX_MESSAGES: "10"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+# KEDA ScaledObject — scales based on SQS queue depth
+keda:
+  enabled: true
+  minReplicaCount: 0         # Scale to zero when queue is empty — zero idle cost
+  maxReplicaCount: 20        # Upper bound — each pod processes 10 msgs concurrently
+  pollingInterval: 15        # Check queue depth every 15 seconds
+  cooldownPeriod: 60         # Wait 60s before scaling to zero
+  sqsQueueLength: 5          # Target: 5 messages per worker replica
+  sqsQueueUrl: ""            # Injected from Terraform output
+  awsRegion: "us-east-1"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false  # Worker needs write access for boto3 cache
+  capabilities:
+    drop:
+      - ALL
+
+podAnnotations:
+  prometheus.io/scrape: "false"  # Worker doesn't expose HTTP metrics endpoint
+
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: role
+              operator: In
+              values:
+                - general
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: worker-service

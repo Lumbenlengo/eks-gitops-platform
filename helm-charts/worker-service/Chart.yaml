@@ -1,0 +1,12 @@
+apiVersion: v2
+name: worker-service
+description: >
+  SQS consumer worker service running on EKS.
+  Scales from 0 to N replicas via KEDA based on SQS queue depth.
+  Writes processed results to DynamoDB via IRSA — zero static credentials.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+maintainers:
+  - name: Patricio Lumbe
+    url: https://patriciolumbe.com

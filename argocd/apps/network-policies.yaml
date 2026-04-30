@@ -1,0 +1,84 @@
+---
+# NetworkPolicy for api-service
+# Default deny all ingress/egress, then explicitly allow what is needed.
+# This is Kubernetes-native network policy — works with VPC CNI + Calico.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-service-netpol
+  namespace: api-service
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: api-service
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Allow traffic from the ALB (all sources — ALB IPs are dynamic)
+    - ports:
+        - port: 8000
+          protocol: TCP
+
+    # Allow Prometheus scraping from the monitoring namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 8000
+          protocol: TCP
+
+  egress:
+    # Allow DNS resolution
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+
+    # Allow HTTPS to AWS APIs (SQS, DynamoDB, Secrets Manager, STS)
+    # AWS VPC endpoints would restrict this further in a strict environment
+    - ports:
+        - port: 443
+          protocol: TCP
+
+    # Allow communication to worker-service namespace (not needed currently
+    # but demonstrates the pattern for service mesh or direct calls)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: worker-service
+---
+# NetworkPolicy for worker-service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: worker-service-netpol
+  namespace: worker-service
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: worker-service
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Worker has no HTTP server — block all ingress except health checks
+    # (no ingress rules = deny all ingress)
+    []
+
+  egress:
+    # Allow DNS
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+
+    # Allow HTTPS to AWS APIs (SQS, DynamoDB, CloudWatch, STS)
+    - ports:
+        - port: 443
+          protocol: TCP

@@ -1,0 +1,127 @@
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "worker-service.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "worker-service.labels" . | nindent 4 }}
+spec:
+  # replicas field intentionally omitted — KEDA owns this value.
+  # Setting it here would conflict with KEDA's ScaledObject controller.
+  selector:
+    matchLabels:
+      {{- include "worker-service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "worker-service.selectorLabels" . | nindent 8 }}
+        version: {{ .Values.image.tag | quote }}
+      annotations:
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # Graceful shutdown — give the worker time to finish current message
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: worker-service
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          env:
+            - name: SERVICE_VERSION
+              value: {{ .Values.image.tag | quote }}
+            {{- range $key, $value := .Values.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+# ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.serviceAccount.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "worker-service.labels" . | nindent 4 }}
+  annotations:
+    {{- with .Values.serviceAccount.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+automountServiceAccountToken: true
+---
+# KEDA ScaledObject
+# This is the heart of the worker service auto-scaling strategy.
+# When SQS queue depth > 0, KEDA scales replicas up proportionally.
+# When queue is empty, KEDA scales to minReplicaCount=0 (zero cost).
+{{- if .Values.keda.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "worker-service.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "worker-service.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "worker-service.fullname" . }}
+  pollingInterval:  {{ .Values.keda.pollingInterval }}
+  cooldownPeriod:   {{ .Values.keda.cooldownPeriod }}
+  minReplicaCount:  {{ .Values.keda.minReplicaCount }}
+  maxReplicaCount:  {{ .Values.keda.maxReplicaCount }}
+  triggers:
+    - type: aws-sqs-queue
+      authenticationRef:
+        name: {{ include "worker-service.fullname" . }}-keda-auth
+      metadata:
+        queueURL:         {{ .Values.keda.sqsQueueUrl | quote }}
+        queueLength:      {{ .Values.keda.sqsQueueLength | quote }}
+        awsRegion:        {{ .Values.keda.awsRegion | quote }}
+        identityOwner:    pod   # Use pod's IRSA identity — not KEDA operator's
+  advanced:
+    restoreToOriginalReplicaCount: false
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 60
+          policies:
+            - type: Pods
+              value: 2
+              periodSeconds: 30
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          policies:
+            - type: Pods
+              value: 5
+              periodSeconds: 15
+{{- end }}
+---
+# TriggerAuthentication — tells KEDA to use pod identity (IRSA) for SQS access
+{{- if .Values.keda.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: {{ include "worker-service.fullname" . }}-keda-auth
+  namespace: {{ .Release.Namespace }}
+spec:
+  podIdentity:
+    provider: aws
+{{- end }}

@@ -1,0 +1,78 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: api-service
+  namespace: argocd
+  # This finalizer ensures ArgoCD deletes all managed resources when this
+  # Application is deleted — prevents orphaned Deployments and Services.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    team: platform
+    environment: prod
+    service: api-service
+  annotations:
+    # Slack notification on sync events (requires ArgoCD Notifications addon)
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: platform-deployments
+    notifications.argoproj.io/subscribe.on-sync-failed.slack: platform-alerts
+    notifications.argoproj.io/subscribe.on-health-degraded.slack: platform-alerts
+spec:
+  project: eks-gitops-platform
+
+  source:
+    repoURL: https://github.com/patriciolumbe/eks-gitops-platform
+    targetRevision: main
+    path: helm-charts/api-service
+
+    helm:
+      releaseName: api-service
+      valueFiles:
+        - values.yaml
+      # These values are set here rather than in values.yaml because they
+      # contain environment-specific secrets or references that should not
+      # be committed to the repo in plain text.
+      parameters:
+        - name: image.repository
+          # Replace with your actual ECR URL from `terraform output ecr_api_service_url`
+          value: "123456789012.dkr.ecr.us-east-1.amazonaws.com/eks-gitops/api-service"
+        - name: serviceAccount.annotations.eks\.amazonaws\.com/role-arn
+          # Replace with your actual role ARN from `terraform output api_service_irsa_role_arn`
+          value: "arn:aws:iam::123456789012:role/eks-gitops-platform-api-service"
+        - name: env.SQS_QUEUE_URL
+          # Replace with output from `terraform output sqs_queue_url`
+          value: "https://sqs.us-east-1.amazonaws.com/123456789012/eks-gitops-worker-queue"
+        - name: env.DYNAMODB_TABLE
+          value: "eks-gitops-items"
+        - name: ingress.annotations.alb\.ingress\.kubernetes\.io/certificate-arn
+          # Replace with your ACM cert ARN
+          value: "arn:aws:acm:us-east-1:123456789012:certificate/YOUR-CERT-ID"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: api-service
+
+  syncPolicy:
+    automated:
+      prune: true      # Delete resources removed from Git
+      selfHeal: true   # Re-apply if someone manually edits resources in the cluster
+      allowEmpty: false
+    syncOptions:
+      - Validate=true
+      - CreateNamespace=false    # Namespace created by Terraform
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true           # Delete old resources after new ones are healthy
+      - ApplyOutOfSyncOnly=true  # Only apply resources that differ from desired state
+      - ServerSideApply=true     # Use server-side apply for better field management
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Health assessment — ArgoCD considers the app healthy only when all pods are ready
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas  # HPA manages replica count — ignore drift here

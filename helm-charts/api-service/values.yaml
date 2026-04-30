@@ -1,0 +1,141 @@
+# ---------------------------------------------------------------------------
+# api-service/values.yaml
+# These are the default production values. Override per-environment in
+# ArgoCD Application specs or via --set flags during development.
+# The CI pipeline updates image.tag on every successful build.
+# ---------------------------------------------------------------------------
+
+replicaCount: 2  # Overridden by HPA at runtime
+
+image:
+  repository: ""          # Set by CI pipeline: <account>.dkr.ecr.<region>.amazonaws.com/eks-gitops/api-service
+  tag: "latest"           # Updated by CI on every merge to main
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: "api-service"
+
+serviceAccount:
+  create: true
+  name: "api-service"
+  annotations:
+    # IRSA — the pod assumes this IAM role via the OIDC token.
+    # Value injected by Terraform output / ArgoCD ApplicationSet.
+    eks.amazonaws.com/role-arn: ""  # Set via ArgoCD helm values or --set
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+  annotations: {}
+
+ingress:
+  enabled: true
+  ingressClassName: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+    # Replace with your ACM certificate ARN
+    alb.ingress.kubernetes.io/certificate-arn: ""
+  hosts:
+    - host: api.patriciolumbe.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+env:
+  ENVIRONMENT: "prod"
+  AWS_REGION: "us-east-1"
+  # Injected at deploy time from Terraform outputs:
+  SQS_QUEUE_URL: ""
+  DYNAMODB_TABLE: ""
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# HPA — scales 2→10 pods based on CPU utilisation
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Pod Disruption Budget — ensure at least 1 pod is available during rolling updates
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Spread pods across AZs — prevents all replicas landing on the same node/AZ
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: api-service
+
+# Liveness and readiness probes
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8000
+  initialDelaySeconds: 15
+  periodSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8000
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 3
+
+# Prometheus scraping
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8000"
+  prometheus.io/path: "/metrics"
+
+# Security context — enforce non-root
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# Node affinity — prefer nodes labelled role=general
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: role
+              operator: In
+              values:
+                - general
+
+# ServiceMonitor for Prometheus scraping via kube-prometheus-stack
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  path: /metrics

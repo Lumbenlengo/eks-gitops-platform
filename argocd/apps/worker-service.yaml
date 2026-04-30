@@ -1,0 +1,87 @@
+# ---------------------------------------------------------------------------
+# argocd/apps/worker-service.yaml
+#
+# ArgoCD Application para o worker-service.
+# O KEDA ScaledObject está incluído no Helm chart (deployment.yaml).
+# Quando o ArgoCD sincroniza, o KEDA começa imediatamente a monitorizar
+# a fila SQS e escala de 0 a N replicas conforme necessário.
+# ---------------------------------------------------------------------------
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: worker-service
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    team: platform
+    environment: prod
+    service: worker-service
+  annotations:
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: platform-deployments
+    notifications.argoproj.io/subscribe.on-sync-failed.slack: platform-alerts
+    notifications.argoproj.io/subscribe.on-health-degraded.slack: platform-alerts
+spec:
+  project: eks-gitops-platform
+
+  source:
+    repoURL: https://github.com/patriciolumbe/eks-gitops-platform
+    targetRevision: main
+    path: helm-charts/worker-service
+
+    helm:
+      releaseName: worker-service
+      valueFiles:
+        - values.yaml
+      parameters:
+        - name: image.repository
+          # Preenche após terraform apply:
+          # terraform output ecr_worker_service_url
+          value: "123456789012.dkr.ecr.us-east-1.amazonaws.com/eks-gitops/worker-service"
+        - name: serviceAccount.annotations.eks\.amazonaws\.com/role-arn
+          # terraform output worker_service_irsa_role_arn
+          value: "arn:aws:iam::123456789012:role/eks-gitops-platform-worker-service"
+        - name: env.SQS_QUEUE_URL
+          # terraform output sqs_queue_url
+          value: "https://sqs.us-east-1.amazonaws.com/123456789012/eks-gitops-worker-queue"
+        - name: env.DYNAMODB_TABLE
+          value: "eks-gitops-items"
+        - name: keda.sqsQueueUrl
+          # Mesmo valor que env.SQS_QUEUE_URL — KEDA lê directamente
+          value: "https://sqs.us-east-1.amazonaws.com/123456789012/eks-gitops-worker-queue"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: worker-service
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - Validate=true
+      - CreateNamespace=false
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # O KEDA gere as replicas — ignora drift neste campo
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    # O KEDA também modifica o ScaledObject — ignora campos geridos por ele
+    - group: keda.sh
+      kind: ScaledObject
+      jsonPointers:
+        - /status

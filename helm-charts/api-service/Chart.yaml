@@ -1,0 +1,17 @@
+apiVersion: v2
+name: api-service
+description: >
+  Production-grade FastAPI service running on EKS.
+  Reads/writes DynamoDB, publishes to SQS, exposes Prometheus metrics.
+  Deployed and managed by ArgoCD via GitOps.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - fastapi
+  - aws
+  - eks
+  - gitops
+maintainers:
+  - name: Patricio Lumbe
+    url: https://patriciolumbe.com

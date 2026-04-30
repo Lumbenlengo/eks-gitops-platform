@@ -1,0 +1,86 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: eks-gitops-platform
+  namespace: argocd
+  # Finalizer prevents accidental deletion of a project that has active Applications
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: "EKS GitOps Platform — API service + Worker service"
+
+  # Only allow syncing from this Git repository
+  sourceRepos:
+    - "https://github.com/patriciolumbe/eks-gitops-platform"
+
+  # Only allow deploying to these namespaces in the local cluster
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: api-service
+    - server: https://kubernetes.default.svc
+      namespace: worker-service
+    - server: https://kubernetes.default.svc
+      namespace: monitoring
+
+  # Cluster-scoped resources this project can manage
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+
+  # Namespace-scoped resources allowed
+  namespaceResourceWhitelist:
+    - group: "apps"
+      kind: Deployment
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ServiceAccount
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: Secret
+    - group: "networking.k8s.io"
+      kind: Ingress
+    - group: "autoscaling"
+      kind: HorizontalPodAutoscaler
+    - group: "policy"
+      kind: PodDisruptionBudget
+    - group: "keda.sh"
+      kind: ScaledObject
+    - group: "keda.sh"
+      kind: TriggerAuthentication
+    - group: "monitoring.coreos.com"
+      kind: ServiceMonitor
+    - group: "external-secrets.io"
+      kind: ExternalSecret
+    - group: "external-secrets.io"
+      kind: SecretStore
+
+  # Sync windows — prevent accidental production deploys during peak hours
+  syncWindows:
+    - kind: deny
+      schedule: "0 9 * * 1-5"   # Block deploys Mon-Fri 9am UTC (business start)
+      duration: 1h
+      applications:
+        - "*"
+      namespaces:
+        - api-service
+        - worker-service
+
+  # Roles — developers can sync but not delete apps
+  roles:
+    - name: developer
+      description: "Read and sync applications"
+      policies:
+        - p, proj:eks-gitops-platform:developer, applications, get, eks-gitops-platform/*, allow
+        - p, proj:eks-gitops-platform:developer, applications, sync, eks-gitops-platform/*, allow
+        - p, proj:eks-gitops-platform:developer, applications, override, eks-gitops-platform/*, allow
+      groups:
+        - eks-gitops-platform:developers
+
+    - name: admin
+      description: "Full access to all applications in this project"
+      policies:
+        - p, proj:eks-gitops-platform:admin, applications, *, eks-gitops-platform/*, allow
+      groups:
+        - eks-gitops-platform:admins

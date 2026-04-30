@@ -1,0 +1,60 @@
+# ---------------------------------------------------------------------------
+# Terraform
+# ---------------------------------------------------------------------------
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/terraform.tfvars         # NEVER commit — contains passwords
+terraform/*.tfvars.local
+terraform/override.tf
+terraform/override.tf.json
+terraform/*_override.tf
+terraform/*_override.tf.json
+terraform/.terraformrc
+terraform/terraform.rc
+crash.log
+crash.*.log
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.venv
+env/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# ---------------------------------------------------------------------------
+# Docker & IDE
+# ---------------------------------------------------------------------------
+.dockerignore
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# ---------------------------------------------------------------------------
+# Secrets & Credentials — NEVER commit
+# ---------------------------------------------------------------------------
+*.pem
+*.key
+*.p12
+*.pfx
+kubeconfig
+.kube/
+aws-credentials
+.aws/credentials
+secrets.yaml
+secrets.json
+*-secret.yaml
+*secret*.env
