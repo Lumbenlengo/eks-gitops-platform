@@ -15,7 +15,8 @@ import os
 import socket
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, List
+from decimal import Decimal
+from typing import Optional, List, Any
 
 import boto3
 from fastapi import FastAPI, HTTPException, Response, status
@@ -35,16 +36,16 @@ logger = logging.getLogger("api-service")
 # ---------------------------------------------------------------------------
 # Configuration from environment
 # ---------------------------------------------------------------------------
-AWS_REGION       = os.environ.get("AWS_REGION", "us-east-1")
-SQS_QUEUE_URL    = os.environ["SQS_QUEUE_URL"]
-DYNAMODB_TABLE   = os.environ["DYNAMODB_TABLE"]
-ENVIRONMENT      = os.environ.get("ENVIRONMENT", "prod")
-SERVICE_VERSION   = os.environ.get("SERVICE_VERSION", "unknown")
+AWS_REGION      = os.environ.get("AWS_REGION", "us-east-1")
+SQS_QUEUE_URL   = os.environ["SQS_QUEUE_URL"]
+DYNAMODB_TABLE  = os.environ["DYNAMODB_TABLE"]
+ENVIRONMENT     = os.environ.get("ENVIRONMENT", "prod")
+SERVICE_VERSION = os.environ.get("SERVICE_VERSION", "unknown")
 
 # ---------------------------------------------------------------------------
 # AWS Clients
 # ---------------------------------------------------------------------------
-sqs      = boto3.client("sqs",      region_name=AWS_REGION)
+sqs      = boto3.client("sqs",       region_name=AWS_REGION)
 dynamodb = boto3.resource("dynamodb", region_name=AWS_REGION)
 table    = dynamodb.Table(DYNAMODB_TABLE)
 
@@ -68,6 +69,19 @@ app.add_middleware(
 
 # Prometheus metrics
 Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _to_int(value: Any, default: int = 1) -> int:
+    """Convert a DynamoDB value (Decimal, str, int, None) to int safely."""
+    if value is None:
+        return default
+    if isinstance(value, Decimal):
+        return int(value)
+    return int(value)
+
 
 # ---------------------------------------------------------------------------
 # Models
@@ -99,20 +113,20 @@ class HealthResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 @app.get("/health", response_model=HealthResponse, tags=["ops"])
-async def health():
+async def health() -> HealthResponse:
     """Health check endpoint proving Multi-AZ via env var or IMDSv2."""
-    return {
-        "status":            "healthy",
-        "hostname":          socket.gethostname(),
-        "availability_zone": os.environ.get("NODE_AZ", "unknown"),
-        "environment":       ENVIRONMENT,
-        "version":           SERVICE_VERSION,
-        "timestamp":         datetime.now(timezone.utc).isoformat(),
-    }
+    return HealthResponse(
+        status="healthy",
+        hostname=socket.gethostname(),
+        availability_zone=os.environ.get("NODE_AZ", "unknown"),
+        environment=ENVIRONMENT,
+        version=SERVICE_VERSION,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+    )
 
 @app.get("/items", response_model=List[ItemResponse], tags=["items"])
-async def list_items(status_filter: Optional[str] = None, limit: int = 20):
-    """List items from DynamoDB with explicit type casting for mypy."""
+async def list_items(status_filter: Optional[str] = None, limit: int = 20) -> List[ItemResponse]:
+    """List items from DynamoDB."""
     try:
         if status_filter:
             response = table.query(
@@ -131,9 +145,9 @@ async def list_items(status_filter: Optional[str] = None, limit: int = 20):
                 id=str(item.get("id", "")),
                 name=str(item.get("name", "")),
                 description=str(item["description"]) if item.get("description") is not None else None,
-                priority=int(str(item.get("priority", 1))),
+                priority=_to_int(item.get("priority"), default=1),
                 status=str(item.get("status", "")),
-                created_at=str(item.get("created_at", ""))
+                created_at=str(item.get("created_at", "")),
             )
             for item in items
         ]
@@ -142,8 +156,8 @@ async def list_items(status_filter: Optional[str] = None, limit: int = 20):
         raise HTTPException(status_code=500, detail="Failed to retrieve items")
 
 @app.get("/items/{item_id}", response_model=ItemResponse, tags=["items"])
-async def get_item(item_id: str):
-    """Get a single item with explicit type casting."""
+async def get_item(item_id: str) -> ItemResponse:
+    """Get a single item."""
     try:
         response = table.scan(
             FilterExpression="id = :id",
@@ -153,15 +167,15 @@ async def get_item(item_id: str):
         items = response.get("Items", [])
         if not items:
             raise HTTPException(status_code=404, detail=f"Item {item_id} not found")
-        
+
         item = items[0]
         return ItemResponse(
             id=str(item.get("id", "")),
             name=str(item.get("name", "")),
             description=str(item["description"]) if item.get("description") is not None else None,
-            priority=int(str(item.get("priority", 1))),
+            priority=_to_int(item.get("priority"), default=1),
             status=str(item.get("status", "")),
-            created_at=str(item.get("created_at", ""))
+            created_at=str(item.get("created_at", "")),
         )
     except HTTPException:
         raise
@@ -170,7 +184,7 @@ async def get_item(item_id: str):
         raise HTTPException(status_code=500, detail="Failed to retrieve item")
 
 @app.post("/items", response_model=ItemResponse, status_code=status.HTTP_201_CREATED, tags=["items"])
-async def create_item(item: ItemCreate):
+async def create_item(item: ItemCreate) -> ItemResponse:
     """Create item and publish to SQS."""
     item_id    = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
@@ -212,17 +226,18 @@ async def create_item(item: ItemCreate):
     except Exception as e:
         logger.warning("SQS publish failed for item %s: %s", item_id, str(e))
 
+    # db_item values are known Python types — access directly, no casting ambiguity
     return ItemResponse(
-        id=str(db_item.get("id", "")),
-        name=str(db_item.get("name", "")),
-        description=str(db_item["description"]) if db_item.get("description") is not None else None,
-        priority=int(str(db_item.get("priority", 1))),
-        status=str(db_item.get("status", "")),
-        created_at=str(db_item.get("created_at", ""))
+        id=item_id,
+        name=item.name,
+        description=item.description,
+        priority=item.priority,
+        status="pending",
+        created_at=created_at,
     )
 
 @app.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["items"])
-async def delete_item(item_id: str):
+async def delete_item(item_id: str) -> Response:
     """Soft-delete via status update."""
     try:
         response = table.scan(
@@ -246,4 +261,4 @@ async def delete_item(item_id: str):
         raise
     except Exception as e:
         logger.error("Failed to delete item %s: %s", item_id, str(e))
-        raise HTTPException(status_code=500, detail="Failed to delete item")
+        raise HTTPException(status_code=500, detail="Failed to delete item") t
