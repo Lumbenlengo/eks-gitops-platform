@@ -7,7 +7,6 @@ FastAPI application that:
   - Exposes GET /metrics (Prometheus-compatible via prometheus_fastapi_instrumentator)
 
 All AWS credentials come from IRSA (IAM Roles for Service Accounts).
-No static keys anywhere.
 """
 
 import json
@@ -16,7 +15,7 @@ import os
 import socket
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List
 
 import boto3
 import httpx
@@ -35,24 +34,23 @@ logging.basicConfig(
 logger = logging.getLogger("api-service")
 
 # ---------------------------------------------------------------------------
-# Configuration from environment (injected by Kubernetes via ConfigMap/Secret)
+# Configuration from environment
 # ---------------------------------------------------------------------------
 AWS_REGION       = os.environ.get("AWS_REGION", "us-east-1")
 SQS_QUEUE_URL    = os.environ["SQS_QUEUE_URL"]
 DYNAMODB_TABLE   = os.environ["DYNAMODB_TABLE"]
 ENVIRONMENT      = os.environ.get("ENVIRONMENT", "prod")
-SERVICE_VERSION  = os.environ.get("SERVICE_VERSION", "unknown")
+SERVICE_VERSION   = os.environ.get("SERVICE_VERSION", "unknown")
 
 # ---------------------------------------------------------------------------
-# AWS Clients — boto3 automatically uses IRSA credentials via the mounted
-# web identity token file. No access keys required.
+# AWS Clients
 # ---------------------------------------------------------------------------
 sqs      = boto3.client("sqs",      region_name=AWS_REGION)
 dynamodb = boto3.resource("dynamodb", region_name=AWS_REGION)
 table    = dynamodb.Table(DYNAMODB_TABLE)
 
 # ---------------------------------------------------------------------------
-# App
+# App Initialization
 # ---------------------------------------------------------------------------
 app = FastAPI(
     title="EKS GitOps API Service",
@@ -69,7 +67,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Prometheus metrics — scraped by kube-prometheus-stack
+# Prometheus metrics
 Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 
 # ---------------------------------------------------------------------------
@@ -79,7 +77,6 @@ Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 def get_availability_zone() -> str:
     """Fetch AZ from EC2 instance metadata (IMDSv2)."""
     try:
-        # IMDSv2: first get token, then use it
         token_resp = httpx.put(
             "http://169.254.169.254/latest/api/token",
             headers={"X-aws-ec2-metadata-token-ttl-seconds": "21600"},
@@ -95,7 +92,6 @@ def get_availability_zone() -> str:
     except Exception:
         return os.environ.get("NODE_AZ", "unknown")
 
-
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
@@ -105,7 +101,6 @@ class ItemCreate(BaseModel):
     description: Optional[str] = Field(None, max_length=1000)
     priority:    int = Field(default=1, ge=1, le=10)
 
-
 class ItemResponse(BaseModel):
     id:          str
     name:        str
@@ -114,15 +109,13 @@ class ItemResponse(BaseModel):
     status:      str
     created_at:  str
 
-
 class HealthResponse(BaseModel):
-    status:       str
-    hostname:     str
+    status:            str
+    hostname:          str
     availability_zone: str
-    environment:  str
-    version:      str
-    timestamp:    str
-
+    environment:       str
+    version:           str
+    timestamp:         str
 
 # ---------------------------------------------------------------------------
 # Routes
@@ -130,11 +123,6 @@ class HealthResponse(BaseModel):
 
 @app.get("/health", response_model=HealthResponse, tags=["ops"])
 async def health():
-    """
-    Health check endpoint.
-    Call this repeatedly to observe Multi-AZ load balancing in action —
-    different availability_zone values prove traffic hits multiple nodes.
-    """
     return {
         "status":            "healthy",
         "hostname":          socket.gethostname(),
@@ -144,10 +132,8 @@ async def health():
         "timestamp":         datetime.now(timezone.utc).isoformat(),
     }
 
-
-@app.get("/items", response_model=list[ItemResponse], tags=["items"])
+@app.get("/items", response_model=List[ItemResponse], tags=["items"])
 async def list_items(status_filter: Optional[str] = None, limit: int = 20):
-    """List items from DynamoDB. Optionally filter by status."""
     try:
         if status_filter:
             response = table.query(
@@ -160,28 +146,25 @@ async def list_items(status_filter: Optional[str] = None, limit: int = 20):
         else:
             response = table.scan(Limit=limit)
 
+        items = response.get("Items", [])
         return [
             ItemResponse(
-                id=item["id"],
-                name=item["name"],
+                id=str(item["id"]),
+                name=str(item["name"]),
                 description=item.get("description"),
                 priority=int(item.get("priority", 1)),
-                status=item["status"],
-                created_at=item["created_at"],
+                status=str(item["status"]),
+                created_at=str(item["created_at"]),
             )
-            for item in response.get("Items", [])
+            for item in items
         ]
     except Exception as e:
         logger.error("Failed to list items: %s", str(e))
         raise HTTPException(status_code=500, detail="Failed to retrieve items")
 
-
 @app.get("/items/{item_id}", response_model=ItemResponse, tags=["items"])
 async def get_item(item_id: str):
-    """Get a single item by ID."""
     try:
-        # We need created_at for the range key — scan by id via GSI in real
-        # production; for simplicity we scan with filter here
         response = table.scan(
             FilterExpression="id = :id",
             ExpressionAttributeValues={":id": item_id},
@@ -190,14 +173,15 @@ async def get_item(item_id: str):
         items = response.get("Items", [])
         if not items:
             raise HTTPException(status_code=404, detail=f"Item {item_id} not found")
+        
         item = items[0]
         return ItemResponse(
-            id=item["id"],
-            name=item["name"],
+            id=str(item["id"]),
+            name=str(item["name"]),
             description=item.get("description"),
             priority=int(item.get("priority", 1)),
-            status=item["status"],
-            created_at=item["created_at"],
+            status=str(item["status"]),
+            created_at=str(item["created_at"]),
         )
     except HTTPException:
         raise
@@ -205,14 +189,8 @@ async def get_item(item_id: str):
         logger.error("Failed to get item %s: %s", item_id, str(e))
         raise HTTPException(status_code=500, detail="Failed to retrieve item")
 
-
 @app.post("/items", response_model=ItemResponse, status_code=status.HTTP_201_CREATED, tags=["items"])
 async def create_item(item: ItemCreate):
-    """
-    Create a new item:
-    1. Write record to DynamoDB with status=pending
-    2. Publish message to SQS for async processing by the worker service
-    """
     item_id    = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
 
@@ -226,7 +204,6 @@ async def create_item(item: ItemCreate):
     }
 
     try:
-        # 1. Persist to DynamoDB
         table.put_item(Item=db_item)
         logger.info("Created item %s in DynamoDB", item_id)
     except Exception as e:
@@ -234,7 +211,6 @@ async def create_item(item: ItemCreate):
         raise HTTPException(status_code=500, detail="Failed to persist item")
 
     try:
-        # 2. Publish to SQS for worker
         sqs.send_message(
             QueueUrl=SQS_QUEUE_URL,
             MessageBody=json.dumps({
@@ -253,15 +229,19 @@ async def create_item(item: ItemCreate):
         )
         logger.info("Published item %s to SQS", item_id)
     except Exception as e:
-        # Non-fatal — item is persisted, worker will retry via DLQ analysis
         logger.warning("SQS publish failed for item %s: %s", item_id, str(e))
 
-    return ItemResponse(**db_item)
-
+    return ItemResponse(
+        id=str(db_item["id"]),
+        name=str(db_item["name"]),
+        description=db_item.get("description"),
+        priority=int(db_item["priority"]),
+        status=str(db_item["status"]),
+        created_at=str(db_item["created_at"])
+    )
 
 @app.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["items"])
 async def delete_item(item_id: str):
-    """Soft-delete an item by setting status=deleted."""
     try:
         response = table.scan(
             FilterExpression="id = :id",
