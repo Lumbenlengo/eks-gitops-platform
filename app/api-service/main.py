@@ -261,4 +261,4 @@ async def delete_item(item_id: str) -> Response:
         raise
     except Exception as e:
         logger.error("Failed to delete item %s: %s", item_id, str(e))
-        raise HTTPException(status_code=500, detail="Failed to delete item") t
+        raise HTTPException(status_code=500, detail="Failed to delete item")
