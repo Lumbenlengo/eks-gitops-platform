@@ -12,7 +12,6 @@ from datetime import datetime, timezone
 from typing import Optional, List
 
 import boto3
-import httpx
 from fastapi import FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
