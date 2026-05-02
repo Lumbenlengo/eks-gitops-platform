@@ -366,3 +366,4 @@ resource "helm_release" "kube_prometheus_stack" {
     module.addons
   ]
 }
+
