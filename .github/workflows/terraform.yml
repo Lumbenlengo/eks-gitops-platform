@@ -34,7 +34,7 @@ concurrency:
 
 env:
   AWS_REGION:     us-east-1
-  AWS_ACCOUNT_ID: "123456789012"
+  AWS_ACCOUNT_ID: "962765734677"
   TF_VERSION:     "1.7.5"
   TF_WORKING_DIR: terraform
   # Terraform will not prompt for input — fail instead
