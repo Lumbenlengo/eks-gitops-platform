@@ -80,6 +80,10 @@ module "networking" {
   public_subnets  = var.public_subnets
   private_subnets = var.private_subnets
   azs             = slice(data.aws_availability_zones.available.names, 0, 3)
+
+  enable_nat_gateway     = true
+  single_nat_gateway     = true
+  one_nat_gateway_per_az = false
 }
 
 module "eks" {

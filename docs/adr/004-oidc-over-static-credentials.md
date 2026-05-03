@@ -29,7 +29,7 @@ The IAM role trust policy restricts which repository and branch can assume it.
 
 The Terraform module `github-actions-iam.tf` already provisions:
 - An IAM OIDC provider for `token.actions.githubusercontent.com`
-- An IAM role with trust policy scoped to `repo:patriciolumbe/eks-gitops-platform:ref:refs/heads/main`
+- An IAM role with trust policy scoped to `repo:Lumbenlengo/eks-gitops-platform:ref:refs/heads/main`
 - Permissions: `ecr:GetAuthorizationToken`, `ecr:BatchCheckLayerAvailability`,
   `ecr:PutImage`, `ecr:InitiateLayerUpload`, `ecr:UploadLayerPart`,
   `ecr:CompleteLayerUpload`

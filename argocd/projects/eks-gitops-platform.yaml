@@ -11,7 +11,7 @@ spec:
 
   # Only allow syncing from this Git repository
   sourceRepos:
-    - "https://github.com/patriciolumbe/eks-gitops-platform"
+    - "https://github.com/Lumbenlengo/eks-gitops-platform"
 
   # Only allow deploying to these namespaces in the local cluster
   destinations:

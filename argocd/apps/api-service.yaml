@@ -20,7 +20,7 @@ spec:
   project: eks-gitops-platform
 
   source:
-    repoURL: https://github.com/patriciolumbe/eks-gitops-platform
+    repoURL: https://github.com/Lumbenlengo/eks-gitops-platform
     targetRevision: main
     path: helm-charts/api-service
 

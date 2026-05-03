@@ -1,7 +1,5 @@
 # ---------------------------------------------------------------------------
 # modules/networking/main.tf
-# VPC with public and private subnets across 3 AZs, NAT Gateway (one per AZ
-# for HA), IGW, and route tables with the EKS-required subnet tags.
 # ---------------------------------------------------------------------------
 
 terraform {
@@ -10,10 +8,7 @@ terraform {
   }
 }
 
-# ---------------------------------------------------------------------------
 # VPC
-# ---------------------------------------------------------------------------
-
 resource "aws_vpc" "this" {
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
@@ -25,20 +20,13 @@ resource "aws_vpc" "this" {
   }
 }
 
-# ---------------------------------------------------------------------------
 # Internet Gateway
-# ---------------------------------------------------------------------------
-
 resource "aws_internet_gateway" "this" {
   vpc_id = aws_vpc.this.id
   tags   = { Name = "${var.cluster_name}-igw" }
 }
 
-# ---------------------------------------------------------------------------
 # Public Subnets
-# EKS requires the tag kubernetes.io/role/elb=1 for ALB/NLB creation
-# ---------------------------------------------------------------------------
-
 resource "aws_subnet" "public" {
   count = length(var.public_subnets)
 
@@ -54,11 +42,7 @@ resource "aws_subnet" "public" {
   }
 }
 
-# ---------------------------------------------------------------------------
 # Private Subnets
-# EKS requires the tag kubernetes.io/role/internal-elb=1 for internal ALBs
-# ---------------------------------------------------------------------------
-
 resource "aws_subnet" "private" {
   count = length(var.private_subnets)
 
@@ -74,11 +58,11 @@ resource "aws_subnet" "private" {
 }
 
 # ---------------------------------------------------------------------------
-# Elastic IPs for NAT Gateways (one per AZ)
+# Elastic IPs for NAT Gateways
 # ---------------------------------------------------------------------------
-
 resource "aws_eip" "nat" {
-  count  = length(var.public_subnets)
+  # If single_nat_gateway is true, only create 1. Otherwise, create one per public subnet.
+  count  = var.single_nat_gateway ? 1 : length(var.public_subnets)
   domain = "vpc"
 
   tags = { Name = "${var.cluster_name}-nat-eip-${var.azs[count.index]}" }
@@ -87,13 +71,11 @@ resource "aws_eip" "nat" {
 }
 
 # ---------------------------------------------------------------------------
-# NAT Gateways — one per AZ for high availability
-# If cost is a constraint during development, reduce to 1 and accept that
-# an AZ failure will block all outbound traffic from private subnets.
+# NAT Gateways
 # ---------------------------------------------------------------------------
-
 resource "aws_nat_gateway" "this" {
-  count = length(var.public_subnets)
+  # Logic: If single_nat_gateway is true, only create 1.
+  count = var.single_nat_gateway ? 1 : length(var.public_subnets)
 
   allocation_id = aws_eip.nat[count.index].id
   subnet_id     = aws_subnet.public[count.index].id
@@ -106,7 +88,6 @@ resource "aws_nat_gateway" "this" {
 # ---------------------------------------------------------------------------
 # Route Tables
 # ---------------------------------------------------------------------------
-
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.this.id
 
@@ -130,7 +111,8 @@ resource "aws_route_table" "private" {
 
   route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.this[count.index].id
+    # All private subnets use the first NAT gateway if single_nat is true
+    nat_gateway_id = var.single_nat_gateway ? aws_nat_gateway.this[0].id : aws_nat_gateway.this[count.index].id
   }
 
   tags = { Name = "${var.cluster_name}-private-rt-${var.azs[count.index]}" }
@@ -143,9 +125,8 @@ resource "aws_route_table_association" "private" {
 }
 
 # ---------------------------------------------------------------------------
-# VPC Flow Logs — required for compliance and incident investigation
+# VPC Flow Logs
 # ---------------------------------------------------------------------------
-
 resource "aws_cloudwatch_log_group" "flow_logs" {
   name              = "/aws/vpc/${var.cluster_name}/flow-logs"
   retention_in_days = 30

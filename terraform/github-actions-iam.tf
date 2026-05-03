@@ -16,7 +16,7 @@
 # ---------------------------------------------------------------------------
 
 
-variable "github_org" { default = "patriciolumbe" }
+variable "github_org" { default = "Lumbenlengo" }
 variable "github_repo" { default = "eks-gitops-platform" }
 
 # ---------------------------------------------------------------------------

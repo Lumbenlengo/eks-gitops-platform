@@ -2,11 +2,11 @@
 
 **Production-grade EKS cluster with ArgoCD GitOps, KEDA event-driven autoscaling, IRSA, External Secrets, Prometheus/Grafana, and full Terraform IaC.**
 
-Live endpoint: **`https://api.patriciolumbe.com/health`** — call it repeatedly to observe Multi-AZ load balancing in action.
+Live endpoint: **`https://api.Lumbenlengo.com/health`** — call it repeatedly to observe Multi-AZ load balancing in action.
 
 ```bash
 # Watch the availability_zone field rotate across us-east-1a, 1b, 1c
-for i in $(seq 1 10); do curl -s https://api.patriciolumbe.com/health | python3 -m json.tool; done
+for i in $(seq 1 10); do curl -s https://api.Lumbenlengo.com/health | python3 -m json.tool; done
 ```
 
 ---
@@ -42,7 +42,7 @@ The worker service scales to **zero pods when the queue is empty** — zero idle
     │                    │  │  │ Public   │    │ Private       │   │   │
     ▼                    │  │  │ Subnets  │    │ Subnets       │   │   │
   Route53 ─────────────▶│  │  │ (3 AZs)  │    │ (3 AZs)       │   │   │
-  api.patriciolumbe.com  │  │  │          │    │               │   │   │
+  api.Lumbenlengo.com  │  │  │          │    │               │   │   │
     │                    │  │  │  ALB     │    │  EKS Nodes    │   │   │
     ▼                    │  │  │  (HTTPS) │───▶│  (t3.medium)  │   │   │
   ACM Certificate        │  │  │          │    │  ASG 2→10     │   │   │
@@ -77,7 +77,7 @@ The worker service scales to **zero pods when the queue is empty** — zero idle
 | Layer | Service | Configuration | Terraform module |
 |---|---|---|---|
 | DNS | Route53 | Hosted zone, alias to ALB | `networking/` |
-| SSL | ACM | api.patriciolumbe.com, auto-renew | `addons/` |
+| SSL | ACM | api.Lumbenlengo.com, auto-renew | `addons/` |
 | Load balancing | AWS ALB | HTTPS 443, managed by ALB Ingress Controller | `addons/` |
 | Cluster | EKS 1.29 | Private nodes, public API endpoint, KMS secrets encryption | `eks/` |
 | Nodes | EC2 ASG | t3.medium, min=2 max=10, IMDSv2, encrypted EBS | `eks/` |
@@ -222,15 +222,15 @@ argocd version         # >= 2.10
 ```bash
 # Create S3 bucket and DynamoDB table for Terraform state
 aws s3api create-bucket \
-  --bucket patriciolumbe-terraform-state \
+  --bucket Lumbenlengo-terraform-state \
   --region us-east-1
 
 aws s3api put-bucket-versioning \
-  --bucket patriciolumbe-terraform-state \
+  --bucket Lumbenlengo-terraform-state \
   --versioning-configuration Status=Enabled
 
 aws s3api put-bucket-encryption \
-  --bucket patriciolumbe-terraform-state \
+  --bucket Lumbenlengo-terraform-state \
   --server-side-encryption-configuration \
     '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
 
@@ -302,7 +302,7 @@ argocd app get api-service --watch
 kubectl rollout status deployment/api-service -n api-service
 
 # 5. Confirm the new version is live
-curl https://api.patriciolumbe.com/health | python3 -m json.tool
+curl https://api.Lumbenlengo.com/health | python3 -m json.tool
 ```
 
 ### Test KEDA worker scaling
@@ -346,4 +346,4 @@ kubectl describe scaledobject worker-service -n worker-service
 
 ---
 
-**patriciolumbe.com** · [LinkedIn](https://linkedin.com/in/patriciolumbe) · [Malt](https://malt.fr/profile/patriciolumbe)
+**Lumbenlengo.com** · [LinkedIn](https://linkedin.com/in/Lumbenlengo) · [Malt](https://malt.fr/profile/Lumbenlengo)

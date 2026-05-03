@@ -13,7 +13,7 @@ variable "cluster_name" {
 variable "cluster_version" {
   description = "Kubernetes version for the EKS cluster"
   type        = string
-  default     = "1.29"
+  default     = "1.30"
 }
 
 variable "environment" {
@@ -100,7 +100,22 @@ variable "tags" {
   default = {
     Project     = "eks-gitops-platform"
     ManagedBy   = "terraform"
-    Owner       = "patriciolumbe"
+    Owner       = "Lumbenlengo"
     Environment = "prod"
   }
+}
+
+variable "enable_nat_gateway" {
+  type    = bool
+  default = true
+}
+
+variable "single_nat_gateway" {
+  type    = bool
+  default = false
+}
+
+variable "one_nat_gateway_per_az" {
+  type    = bool
+  default = false
 }

@@ -6,7 +6,7 @@ region       = "us-east-1"
 account_id   = "962765734677"
 
 # EKS Cluster Configuration
-cluster_version    = "1.29"
+cluster_version    = "1.30"
 node_capacity_type = "ON_DEMAND"
 node_instance_type = "t3.medium"
 

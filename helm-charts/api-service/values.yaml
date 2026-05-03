@@ -44,7 +44,7 @@ ingress:
     # Replace with your ACM certificate ARN
     alb.ingress.kubernetes.io/certificate-arn: ""
   hosts:
-    - host: api.patriciolumbe.com
+    - host: api.Lumbenlengo.com
       paths:
         - path: /
           pathType: Prefix

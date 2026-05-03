@@ -227,7 +227,7 @@ jobs:
       needs.plan.outputs.exitcode == '2'
     environment:
       name: production
-      url: https://patriciolumbe.com
+      url: https://Lumbenlengo.com
 
     steps:
       - name: Checkout
