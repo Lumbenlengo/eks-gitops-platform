@@ -79,13 +79,13 @@ variable "ecr_worker_service_repo" {
 variable "sqs_queue_name" {
   description = "Name of the SQS queue for the worker service"
   type        = string
-  default     = "eks-gitops-worker-queue"
+  default     = "order-processing-queue"
 }
 
 variable "dynamodb_table_name" {
   description = "Name of the DynamoDB table used by the worker service"
   type        = string
-  default     = "eks-gitops-items"
+  default     = "order-storage-table"
 }
 
 variable "argocd_namespace" {
