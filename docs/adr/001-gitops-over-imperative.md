@@ -1,4 +1,4 @@
-# ADR 001 — GitOps over Imperative Deployments
+# ADR 001 GitOps over Imperative Deployments
 
 **Status:** Accepted  
 **Date:** 2025-01-01  
@@ -23,7 +23,7 @@ We chose **Option B — GitOps with ArgoCD**.
 
 ## Rationale
 
-### 1. Git is the single source of truth
+## 1. Git is the single source of truth
 
 With imperative deployments, the cluster state can drift from what is in the repository. A
 developer could run `kubectl edit deployment` in the cluster and the change would never be
@@ -44,7 +44,7 @@ ArgoCD monitors pod health via readiness probes. If a new deployment fails healt
 can be configured to automatically roll back to the previous revision. This happens without human
 intervention and without the CI pipeline needing error-handling logic for cluster failures.
 
-### 4. Full audit trail
+## 4. Full audit trail
 
 Every deployment is a Git commit with author, timestamp, and diff. The ArgoCD UI shows the full
 sync history. Combined, these give a complete audit trail: who deployed what, when, and what
