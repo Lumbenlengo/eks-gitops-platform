@@ -134,17 +134,11 @@ jobs:
         run: |
           terraform init \
             -reconfigure \
-            -backend-config="region=${AWS_REGION}"
-        working-directory: ${{ env.TF_WORKING_DIR }}
-
-      - name: Terraform Plan
-        id: plan
-        run: |
-          terraform plan \
-            -no-color \
-            -detailed-exitcode \
-            -out=tfplan \
-            -var="aws_region=${AWS_REGION}"
+            -backend-config="bucket=eks-gitops-platform-tfstate-962765734677" \
+            -backend-config="key=terraform.tfstate" \
+            -backend-config="region=us-east-1" \
+            -backend-config="dynamodb_table=terraform-locks" \
+            -backend-config="encrypt=true"
         working-directory: ${{ env.TF_WORKING_DIR }}
         continue-on-error: true  # exitcode=2 means changes present (not an error)
 
