@@ -1,4 +1,3 @@
-# ---------------------------------------------------------------------------
 # modules/addons/main.tf
 # Cluster add-ons deployed via Helm:
 #   - AWS Load Balancer Controller (ALB Ingress)
