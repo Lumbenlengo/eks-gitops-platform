@@ -63,16 +63,15 @@ provider "kubectl" {
   load_config_file       = false
 }
 
-# ---------------------------------------------------------------------------
 # Data sources
-# ---------------------------------------------------------------------------
+
 
 data "aws_caller_identity" "current" {}
 data "aws_availability_zones" "available" { state = "available" }
 
-# ---------------------------------------------------------------------------
+
 # Modules
-# ---------------------------------------------------------------------------
+
 
 module "networking" {
   source = "./modules/networking"
@@ -135,12 +134,11 @@ module "addons" {
   depends_on = [module.eks]
 }
 
-# ---------------------------------------------------------------------------
+
 # ArgoCD namespace + Helm install
 # ArgoCD is installed via Helm directly from Terraform so that the cluster
 # is GitOps-managed from day one. All subsequent app deployments go through
-# ArgoCD — Terraform only manages the bootstrapping.
-# ---------------------------------------------------------------------------
+
 
 resource "kubernetes_namespace" "argocd" {
   metadata {
