@@ -37,7 +37,7 @@ provider "aws" {
 
 # The kubernetes, helm, and kubectl providers all auth via the EKS cluster
 # credentials. Using `data` sources here means Terraform fetches a short-lived
-# token on every run — no static kubeconfig required.
+# token on every run  no static kubeconfig required.
 data "aws_eks_cluster_auth" "this" {
   name = module.eks.cluster_name
 }
