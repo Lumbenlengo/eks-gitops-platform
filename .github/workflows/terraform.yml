@@ -44,10 +44,12 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
       - name: Terraform Init
         working-directory: terraform/layers/00-bootstrap
-        run: terraform init
+        run: |
+          terraform init -input=false \
+            -backend-config=../../environments/${{ env.BACKEND_ENV }}/bootstrap.tfvars
       - name: Terraform Plan
         working-directory: terraform/layers/00-bootstrap
-        run: terraform plan -no-color -out=tfplan
+        run: terraform plan -no-color -input=false -out=tfplan
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         working-directory: terraform/layers/00-bootstrap
@@ -70,11 +72,11 @@ jobs:
       - name: Terraform Init
         working-directory: terraform/layers/01-foundation
         run: |
-          terraform init \
+          terraform init -input=false \
             -backend-config=../../environments/${{ env.BACKEND_ENV }}/foundation.tfvars
       - name: Terraform Plan
         working-directory: terraform/layers/01-foundation
-        run: terraform plan -no-color -out=tfplan
+        run: terraform plan -no-color -input=false -out=tfplan
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         working-directory: terraform/layers/01-foundation
@@ -97,11 +99,11 @@ jobs:
       - name: Terraform Init
         working-directory: terraform/layers/02-platform
         run: |
-          terraform init \
+          terraform init -input=false \
             -backend-config=../../environments/${{ env.BACKEND_ENV }}/platform.tfvars
       - name: Terraform Plan
         working-directory: terraform/layers/02-platform
-        run: terraform plan -no-color -out=tfplan
+        run: terraform plan -no-color -input=false -out=tfplan
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         working-directory: terraform/layers/02-platform
@@ -124,11 +126,11 @@ jobs:
       - name: Terraform Init
         working-directory: terraform/layers/03-addons
         run: |
-          terraform init \
+          terraform init -input=false \
             -backend-config=../../environments/${{ env.BACKEND_ENV }}/addons.tfvars
       - name: Terraform Plan
         working-directory: terraform/layers/03-addons
-        run: terraform plan -no-color -out=tfplan
+        run: terraform plan -no-color -input=false -out=tfplan
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         working-directory: terraform/layers/03-addons
