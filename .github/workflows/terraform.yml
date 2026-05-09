@@ -1,4 +1,4 @@
-  name: Terraform — 4 Layer Pipeline
+name: Terraform — 4 Layer Pipeline
 
 on:
   push:
@@ -142,10 +142,10 @@ jobs:
     steps:
       - name: Report status
         run: |
-          echo "##  Terraform 4-Layer Pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "## 🏗️ Terraform 4-Layer Pipeline" >> $GITHUB_STEP_SUMMARY
           echo "| Layer | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| 00 Bootstrap  | ${{ needs.bootstrap.result }}  |" >> $GITHUB_STEP_SUMMARY
           echo "| 01 Foundation | ${{ needs.foundation.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| 02 Platform   | ${{ needs.platform.result }}   |" >> $GITHUB_STEP_SUMMARY
-          echo "| 03 Addons     | ${{ needs.addons.result }}     |" >> $GITHUB_STEP_SUMMARY        
+          echo "| 03 Addons     | ${{ needs.addons.result }}     |" >> $GITHUB_STEP_SUMMARY

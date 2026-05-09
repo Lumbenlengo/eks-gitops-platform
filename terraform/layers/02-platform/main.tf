@@ -1,0 +1,63 @@
+terraform {
+  required_version = ">= 1.5"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.40"
+    }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
+  }
+  backend "s3" {}
+}
+
+provider "aws" {
+  region = var.aws_region
+  default_tags {
+    tags = var.tags
+  }
+}
+
+data "terraform_remote_state" "foundation" {
+  backend = "s3"
+  config = {
+    bucket = "eks-gitops-platform-tfstate-962765734677"
+    key    = "foundation/terraform.tfstate"
+    region = "us-east-1"
+  }
+}
+
+data "aws_caller_identity" "current" {}
+
+module "eks" {
+  source = "../../modules/eks"
+
+  cluster_name       = var.cluster_name
+  cluster_version    = var.cluster_version
+  vpc_id             = data.terraform_remote_state.foundation.outputs.vpc_id
+  private_subnet_ids = data.terraform_remote_state.foundation.outputs.private_subnet_ids
+  public_subnet_ids  = data.terraform_remote_state.foundation.outputs.public_subnet_ids
+
+  node_group_instance_types = var.node_group_instance_types
+  node_group_desired_size   = var.node_group_desired_size
+  node_group_min_size       = var.node_group_min_size
+  node_group_max_size       = var.node_group_max_size
+
+  account_id = data.aws_caller_identity.current.account_id
+}
+
+module "irsa" {
+  source = "../../modules/irsa"
+
+  cluster_name        = var.cluster_name
+  oidc_provider_arn   = module.eks.oidc_provider_arn
+  oidc_provider_url   = module.eks.cluster_oidc_issuer_url
+  sqs_queue_name      = var.sqs_queue_name
+  dynamodb_table_name = var.dynamodb_table_name
+  account_id          = data.aws_caller_identity.current.account_id
+  aws_region          = var.aws_region
+
+  depends_on = [module.eks]
+}
