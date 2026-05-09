@@ -142,7 +142,7 @@ jobs:
     steps:
       - name: Report status
         run: |
-          echo "## 🏗️ Terraform 4-Layer Pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "##  Terraform 4-Layer Pipeline" >> $GITHUB_STEP_SUMMARY
           echo "| Layer | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| 00 Bootstrap  | ${{ needs.bootstrap.result }}  |" >> $GITHUB_STEP_SUMMARY
