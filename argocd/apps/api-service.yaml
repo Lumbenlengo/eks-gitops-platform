@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://github.com/Lumbenlengo/eks-gitops-platform.git
     targetRevision: HEAD
-    path: terraform/modules/addons/charts/api-service
+    path: helm-charts/api-service
     helm:
       values: |
         image:
