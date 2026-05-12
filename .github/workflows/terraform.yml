@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  AWS_REGION:      ${{ secrets.AWS_REGION }}
+  AWS_REGION:      us-east-1
   AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
   TF_VERSION:      "1.7.5"
   BACKEND_ENV:     "prod"
