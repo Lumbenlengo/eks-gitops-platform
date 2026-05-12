@@ -3,7 +3,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.40"
+      version = ">= 5.45.0" # Versão que suporta Access Entries estavelmente
     }
     tls = {
       source  = "hashicorp/tls"
@@ -31,11 +31,6 @@ data "terraform_remote_state" "foundation" {
 
 data "aws_caller_identity" "current" {}
 
-# Buscando o ARN oficial da política de forma dinâmica e segura
-data "aws_eks_access_policy" "admin" {
-  name = "AmazonEKSClusterAdminPolicy"
-}
-
 module "eks" {
   source = "../../modules/eks"
 
@@ -53,7 +48,6 @@ module "eks" {
 
 module "irsa" {
   source = "../../modules/irsa"
-
   cluster_name        = var.cluster_name
   oidc_provider_arn   = module.eks.oidc_provider_arn
   oidc_provider_url   = module.eks.cluster_oidc_issuer_url
@@ -61,9 +55,12 @@ module "irsa" {
   dynamodb_table_name = var.dynamodb_table_name
   account_id          = data.aws_caller_identity.current.account_id
   aws_region          = var.aws_region
-
-  depends_on = [module.eks]
+  depends_on          = [module.eks]
 }
+
+# ---------------------------------------------------------------------------
+# EKS Access Entry - O ARN CORRETO PARA 2026
+# ---------------------------------------------------------------------------
 
 resource "aws_eks_access_entry" "github_actions" {
   cluster_name      = module.eks.cluster_name
@@ -73,7 +70,8 @@ resource "aws_eks_access_entry" "github_actions" {
 
 resource "aws_eks_access_policy_association" "github_actions_admin" {
   cluster_name  = module.eks.cluster_name
-  policy_arn    = data.aws_eks_access_policy.admin.arn
+  # ATENÇÃO: ARN correto não tem "service-role"
+  policy_arn    = "arn:aws:iam::aws:policy/AmazonEKSClusterAdminPolicy"
   principal_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/github-actions-terraform"
 
   access_scope {
