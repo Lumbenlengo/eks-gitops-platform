@@ -60,21 +60,10 @@ module "irsa" {
   depends_on = [module.eks]
 }
 
-resource "aws_eks_access_entry" "github_actions" {
-  cluster_name      = module.eks.cluster_name
-  principal_arn     = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/github-actions-terraform"
-  type              = "STANDARD"
-}
+# ---------------------------------------------------------------------------
+# EKS Access Entry - Unificado e sem duplicados
+# ---------------------------------------------------------------------------
 
-resource "aws_eks_access_policy_association" "github_actions_admin" {
-  cluster_name  = module.eks.cluster_name
-  policy_arn    = "arn:aws:iam::aws:policy/AmazonEKSClusterAdminPolicy"
-  principal_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/github-actions-terraform"
-
-  access_scope {
-    type = "cluster"
-  }
-}
 resource "aws_eks_access_entry" "github_actions" {
   cluster_name      = module.eks.cluster_name
   principal_arn     = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/github-actions-terraform"
