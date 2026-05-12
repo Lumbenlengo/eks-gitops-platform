@@ -258,3 +258,4 @@ jobs:
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         working-directory: terraform/layers/03-addons
         run: terraform apply -no-color -auto-approve tfplan
+
