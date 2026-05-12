@@ -230,11 +230,11 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
       - name: Init
-        working-directory: terraform/layers/03-apps
-        run: terraform init -input=false -backend-config=../../environments/${{ env.BACKEND_ENV }}/apps.tfvars
+        working-directory: terraform/layers/03-addons
+        run: terraform init -input=false -backend-config=../../environments/${{ env.BACKEND_ENV }}/addons.tfvars
       - name: Plan
         id: plan
-        working-directory: terraform/layers/03-apps
+        working-directory: terraform/layers/03-addons
         continue-on-error: true
         run: |
           terraform plan -no-color -input=false \
@@ -247,7 +247,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
-            const plan = fs.readFileSync('terraform/layers/03-apps/plan_output.txt', 'utf8');
+            const plan = fs.readFileSync('terraform/layers/03-addons/plan_output.txt', 'utf8');
             const truncated = plan.length > 60000 ? plan.slice(0, 60000) + '\n\n... [truncated]' : plan;
             const body = `### Layer 03 — Apps\n<details><summary>Show Plan</summary>\n\n\`\`\`hcl\n${truncated}\n\`\`\`\n</details>`;
             github.rest.issues.createComment({ issue_number: context.issue.number, owner: context.repo.owner, repo: context.repo.repo, body });
@@ -256,5 +256,5 @@ jobs:
         run: exit 1
       - name: Apply
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        working-directory: terraform/layers/03-apps
+        working-directory: terraform/layers/03-addons
         run: terraform apply -no-color -auto-approve tfplan
