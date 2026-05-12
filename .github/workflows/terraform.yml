@@ -94,6 +94,7 @@ jobs:
         continue-on-error: true
         run: |
           terraform plan -no-color -input=false \
+            -var="cluster_name=" -var="cluster_endpoint=" -var="cluster_ca_cert=" \
             -var-file=../../environments/${{ env.BACKEND_ENV }}/terraform.tfvars \
             -out=tfplan 2>&1 | tee plan_output.txt
       - name: PR Comment
@@ -142,6 +143,7 @@ jobs:
         continue-on-error: true
         run: |
           terraform plan -no-color -input=false \
+            -var="cluster_name=" -var="cluster_endpoint=" -var="cluster_ca_cert=" \
             -var-file=../../environments/${{ env.BACKEND_ENV }}/terraform.tfvars \
             -out=tfplan 2>&1 | tee plan_output.txt
       - name: PR Comment
@@ -190,6 +192,7 @@ jobs:
         continue-on-error: true
         run: |
           terraform plan -no-color -input=false \
+            -var="cluster_name=" -var="cluster_endpoint=" -var="cluster_ca_cert=" \
             -var-file=../../environments/${{ env.BACKEND_ENV }}/terraform.tfvars \
             -out=tfplan 2>&1 | tee plan_output.txt
       - name: PR Comment
@@ -238,6 +241,7 @@ jobs:
         continue-on-error: true
         run: |
           terraform plan -no-color -input=false \
+            -var="cluster_name=" -var="cluster_endpoint=" -var="cluster_ca_cert=" \
             -var-file=../../environments/${{ env.BACKEND_ENV }}/terraform.tfvars \
             -out=tfplan 2>&1 | tee plan_output.txt
       - name: PR Comment
