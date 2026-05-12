@@ -1,83 +1,260 @@
-name: Terraform — 4 Layer Pipeline
+name: "Terraform — 4 Layer Pipeline"
 
 on:
   push:
     branches: [ main ]
-    paths: ["terraform/**", ".github/workflows/terraform.yml"]
+    paths:
+      - "terraform/**"
+      - ".github/workflows/terraform.yml"
   pull_request:
     branches: [ main ]
-    paths: ["terraform/**"]
+    paths:
+      - "terraform/**"
+
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
-  AWS_REGION:     us-east-1
-  AWS_ACCOUNT_ID: "962765734677"
-  TF_VERSION:     "1.7.5"
-  BACKEND_ENV:    "prod"
+  AWS_REGION:      ${{ secrets.AWS_REGION }}
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  TF_VERSION:      "1.7.5"
+  BACKEND_ENV:     "prod"
 
 permissions:
-  id-token: write
-  contents: read
+  id-token:       write
+  contents:       read
+  pull-requests:  write
 
 jobs:
+  detect-changes:
+    name: "Detect Changed Layers"
+    runs-on: ubuntu-latest
+    outputs:
+      bootstrap:   ${{ steps.changes.outputs.bootstrap }}
+      foundation:  ${{ steps.changes.outputs.foundation }}
+      platform:    ${{ steps.changes.outputs.platform }}
+      apps:        ${{ steps.changes.outputs.apps }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed paths
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_SHA="HEAD~1"
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE_SHA" HEAD)
+          
+          for layer in bootstrap foundation platform apps; do
+            if echo "$CHANGED" | grep -qE "^terraform/layers/0.*${layer}/|^terraform/modules/"; then
+              echo "${layer}=true"  >> "$GITHUB_OUTPUT"
+            else
+              echo "${layer}=false" >> "$GITHUB_OUTPUT"
+            fi
+          done
+
+          if echo "$CHANGED" | grep -q ".github/workflows/terraform.yml"; then
+            echo "bootstrap=true"  >> "$GITHUB_OUTPUT"
+            echo "foundation=true" >> "$GITHUB_OUTPUT"
+            echo "platform=true"   >> "$GITHUB_OUTPUT"
+            echo "apps=true"       >> "$GITHUB_OUTPUT"
+          fi
+
   bootstrap:
     name: "Layer 00 — Bootstrap"
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.bootstrap == 'true'
     steps:
-      - uses: actions/checkout@v4
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-terraform
           aws-region: ${{ env.AWS_REGION }}
-      - uses: hashicorp/setup-terraform@v3
+          role-session-name: tf-bootstrap-${{ github.run_id }}
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
-      
-      - name: Terraform Init
+      - name: Init
         working-directory: terraform/layers/00-bootstrap
-        run: |
-          terraform init -input=false \
-            -backend-config=../../environments/${{ env.BACKEND_ENV }}/bootstrap.tfvars
-      
-      - name: Terraform Plan
+        run: terraform init -input=false -backend-config=../../environments/${{ env.BACKEND_ENV }}/bootstrap.tfvars
+      - name: Plan
+        id: plan
         working-directory: terraform/layers/00-bootstrap
+        continue-on-error: true
         run: |
           terraform plan -no-color -input=false \
             -var-file=../../environments/${{ env.BACKEND_ENV }}/terraform.tfvars \
-            -out=tfplan
-      
-      - name: Terraform Apply
-        if: github.ref == 'refs/heads/main'
+            -out=tfplan 2>&1 | tee plan_output.txt
+      - name: PR Comment
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('terraform/layers/00-bootstrap/plan_output.txt', 'utf8');
+            const truncated = plan.length > 60000 ? plan.slice(0, 60000) + '\n\n... [truncated]' : plan;
+            const body = `### Layer 00 — Bootstrap\n<details><summary>Show Plan</summary>\n\n\`\`\`hcl\n${truncated}\n\`\`\`\n</details>`;
+            github.rest.issues.createComment({ issue_number: context.issue.number, owner: context.repo.owner, repo: context.repo.repo, body });
+      - name: Check Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+      - name: Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         working-directory: terraform/layers/00-bootstrap
         run: terraform apply -no-color -auto-approve tfplan
 
   foundation:
     name: "Layer 01 — Foundation"
     runs-on: ubuntu-latest
-    needs: bootstrap
+    needs: [detect-changes, bootstrap]
+    if: always() && needs.detect-changes.outputs.foundation == 'true' && (needs.bootstrap.result == 'success' || needs.bootstrap.result == 'skipped')
     steps:
-      - uses: actions/checkout@v4
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-terraform
           aws-region: ${{ env.AWS_REGION }}
-      - uses: hashicorp/setup-terraform@v3
+          role-session-name: tf-foundation-${{ github.run_id }}
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
-      
-      - name: Terraform Init
+      - name: Init
         working-directory: terraform/layers/01-foundation
-        run: |
-          terraform init -input=false \
-            -backend-config=../../environments/${{ env.BACKEND_ENV }}/foundation.tfvars
-      
-      - name: Terraform Plan
+        run: terraform init -input=false -backend-config=../../environments/${{ env.BACKEND_ENV }}/foundation.tfvars
+      - name: Plan
+        id: plan
         working-directory: terraform/layers/01-foundation
+        continue-on-error: true
         run: |
           terraform plan -no-color -input=false \
             -var-file=../../environments/${{ env.BACKEND_ENV }}/terraform.tfvars \
-            -out=tfplan
-      
-      - name: Terraform Apply
-        if: github.ref == 'refs/heads/main'
+            -out=tfplan 2>&1 | tee plan_output.txt
+      - name: PR Comment
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('terraform/layers/01-foundation/plan_output.txt', 'utf8');
+            const truncated = plan.length > 60000 ? plan.slice(0, 60000) + '\n\n... [truncated]' : plan;
+            const body = `### Layer 01 — Foundation\n<details><summary>Show Plan</summary>\n\n\`\`\`hcl\n${truncated}\n\`\`\`\n</details>`;
+            github.rest.issues.createComment({ issue_number: context.issue.number, owner: context.repo.owner, repo: context.repo.repo, body });
+      - name: Check Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+      - name: Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         working-directory: terraform/layers/01-foundation
+        run: terraform apply -no-color -auto-approve tfplan
+
+  platform:
+    name: "Layer 02 — Platform"
+    runs-on: ubuntu-latest
+    needs: [detect-changes, foundation]
+    if: always() && needs.detect-changes.outputs.platform == 'true' && (needs.foundation.result == 'success' || needs.foundation.result == 'skipped')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-terraform
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: tf-platform-${{ github.run_id }}
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      - name: Init
+        working-directory: terraform/layers/02-platform
+        run: terraform init -input=false -backend-config=../../environments/${{ env.BACKEND_ENV }}/platform.tfvars
+      - name: Plan
+        id: plan
+        working-directory: terraform/layers/02-platform
+        continue-on-error: true
+        run: |
+          terraform plan -no-color -input=false \
+            -var-file=../../environments/${{ env.BACKEND_ENV }}/terraform.tfvars \
+            -out=tfplan 2>&1 | tee plan_output.txt
+      - name: PR Comment
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('terraform/layers/02-platform/plan_output.txt', 'utf8');
+            const truncated = plan.length > 60000 ? plan.slice(0, 60000) + '\n\n... [truncated]' : plan;
+            const body = `### Layer 02 — Platform\n<details><summary>Show Plan</summary>\n\n\`\`\`hcl\n${truncated}\n\`\`\`\n</details>`;
+            github.rest.issues.createComment({ issue_number: context.issue.number, owner: context.repo.owner, repo: context.repo.repo, body });
+      - name: Check Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+      - name: Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        working-directory: terraform/layers/02-platform
+        run: terraform apply -no-color -auto-approve tfplan
+
+  apps:
+    name: "Layer 03 — Apps"
+    runs-on: ubuntu-latest
+    needs: [detect-changes, platform]
+    if: always() && needs.detect-changes.outputs.apps == 'true' && (needs.platform.result == 'success' || needs.platform.result == 'skipped')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-terraform
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: tf-apps-${{ github.run_id }}
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      - name: Init
+        working-directory: terraform/layers/03-apps
+        run: terraform init -input=false -backend-config=../../environments/${{ env.BACKEND_ENV }}/apps.tfvars
+      - name: Plan
+        id: plan
+        working-directory: terraform/layers/03-apps
+        continue-on-error: true
+        run: |
+          terraform plan -no-color -input=false \
+            -var-file=../../environments/${{ env.BACKEND_ENV }}/terraform.tfvars \
+            -out=tfplan 2>&1 | tee plan_output.txt
+      - name: PR Comment
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('terraform/layers/03-apps/plan_output.txt', 'utf8');
+            const truncated = plan.length > 60000 ? plan.slice(0, 60000) + '\n\n... [truncated]' : plan;
+            const body = `### Layer 03 — Apps\n<details><summary>Show Plan</summary>\n\n\`\`\`hcl\n${truncated}\n\`\`\`\n</details>`;
+            github.rest.issues.createComment({ issue_number: context.issue.number, owner: context.repo.owner, repo: context.repo.repo, body });
+      - name: Check Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+      - name: Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        working-directory: terraform/layers/03-apps
         run: terraform apply -no-color -auto-approve tfplan
