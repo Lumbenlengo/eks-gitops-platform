@@ -28,8 +28,8 @@ variable "tags" {
   }
 }
 
-# Optional variables to avoid 'No value' errors during plan.
-# These will be populated via remote_state in main.tf.
+# Optional variables with defaults to bypass initial validation.
+# Values are dynamically injected via remote_state in main.tf.
 variable "cluster_name" { 
   type    = string
   default = "" 
