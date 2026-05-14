@@ -20,12 +20,11 @@ ingress:
     alb.ingress.kubernetes.io/healthcheck-path: /
     alb.ingress.kubernetes.io/healthcheck-port: '80'
   hosts:
-    - host: "*"
+    - host: ""
       paths:
         - path: /
           pathType: Prefix
 
-# ALIGNING PROBES TO PORT 80
 livenessProbe:
   httpGet:
     path: /
@@ -34,3 +33,19 @@ readinessProbe:
   httpGet:
     path: /
     port: 80
+
+# Adicionei isto para garantir que o Deployment não falhe por falta de recursos definidos
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: false
+
+serviceAccount:
+  create: true
+  name: "api-service-sa"
