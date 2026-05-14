@@ -20,7 +20,7 @@ ingress:
     alb.ingress.kubernetes.io/healthcheck-path: /
     alb.ingress.kubernetes.io/healthcheck-port: '80'
   hosts:
-    - host: ""
+    - host: ""  # MANTÉM VAZIO ASSIM
       paths:
         - path: /
           pathType: Prefix
@@ -34,7 +34,6 @@ readinessProbe:
     path: /
     port: 80
 
-# Adicionei isto para garantir que o Deployment não falhe por falta de recursos definidos
 resources:
   limits:
     cpu: 100m
