@@ -5,9 +5,6 @@ image:
   pullPolicy: IfNotPresent
   tag: "latest"
 
-serviceAccount:
-  name: ""
-
 service:
   type: ClusterIP
   port: 80
@@ -21,49 +18,19 @@ ingress:
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
     alb.ingress.kubernetes.io/healthcheck-path: /
-    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-port: '80'
   hosts:
-    - host: ""
+    - host: "*"
       paths:
         - path: /
           pathType: Prefix
 
-autoscaling:
-  enabled: true
-  minReplicas: 2
-  maxReplicas: 5
-  targetCPUUtilizationPercentage: 80
-
-podAnnotations: {}
-
-podSecurityContext: {}
-
-securityContext: {}
-
-resources:
-  requests:
-    cpu: "100m"
-    memory: "128Mi"
-  limits:
-    cpu: "500m"
-    memory: "256Mi"
-
+# ALIGNING PROBES TO PORT 80
 livenessProbe:
   httpGet:
     path: /
-    port: http
-  initialDelaySeconds: 10
-  periodSeconds: 15
-
+    port: 80
 readinessProbe:
   httpGet:
     path: /
-    port: http
-  initialDelaySeconds: 5
-  periodSeconds: 10
-
-topologySpreadConstraints: []
-
-affinity: {}
-
-env: {}
+    port: 80
