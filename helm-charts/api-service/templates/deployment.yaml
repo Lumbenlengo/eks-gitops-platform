@@ -9,6 +9,7 @@ metadata:
     # Forces ArgoCD to detect config changes (env vars, secrets) in addition
     # to image tag changes. Without this, env-only changes won't trigger rollout.
     configmap.reloader.stakater.com/reload: "{{ include "api-service.fullname" . }}-config"
+    secret.reloader.stakater.com/reload: "{{ include "api-service.fullname" . }}-secrets"
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
