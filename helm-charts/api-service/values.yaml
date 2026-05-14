@@ -1,9 +1,12 @@
 replicaCount: 2
 
 image:
-  repository: "public.ecr.aws/docker/library/httpd" # Imagem de teste leve
+  repository: "public.ecr.aws/docker/library/httpd"
   pullPolicy: IfNotPresent
   tag: "latest"
+
+serviceAccount:
+  name: ""
 
 service:
   type: ClusterIP
@@ -20,7 +23,7 @@ ingress:
     alb.ingress.kubernetes.io/healthcheck-path: /
     alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
   hosts:
-    - host: "orders-api.local"
+    - host: ""
       paths:
         - path: /
           pathType: Prefix
@@ -30,3 +33,37 @@ autoscaling:
   minReplicas: 2
   maxReplicas: 5
   targetCPUUtilizationPercentage: 80
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "256Mi"
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 15
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+topologySpreadConstraints: []
+
+affinity: {}
+
+env: {}
