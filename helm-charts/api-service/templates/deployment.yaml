@@ -6,8 +6,6 @@ metadata:
   labels:
     {{- include "api-service.labels" . | nindent 4 }}
   annotations:
-    # Forces ArgoCD to detect config changes (env vars, secrets) in addition
-    # to image tag changes. Without this, env-only changes won't trigger rollout.
     configmap.reloader.stakater.com/reload: "{{ include "api-service.fullname" . }}-config"
     secret.reloader.stakater.com/reload: "{{ include "api-service.fullname" . }}-secrets"
 spec:
@@ -21,7 +19,7 @@ spec:
     type: RollingUpdate
     rollingUpdate:
       maxSurge: 1
-      maxUnavailable: 0  # Zero-downtime — always keep all replicas running during deploy
+      maxUnavailable: 0
   template:
     metadata:
       labels:
@@ -47,7 +45,7 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           ports:
             - name: http
-              containerPort: 8000
+              containerPort: 80
               protocol: TCP
           env:
             - name: SERVICE_VERSION
@@ -74,11 +72,10 @@ spec:
             - name: tmp
               mountPath: /tmp
       volumes:
-        # Read-only root fs requires a writable /tmp
         - name: tmp
           emptyDir: {}
       {{- with .Values.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      terminationGracePeriodSeconds: 30
+      terminationGracePeriodSeconds: 30 

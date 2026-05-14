@@ -1,7 +1,7 @@
 replicaCount: 2
 
 image:
-  repository: "public.ecr.aws/docker/library/httpd"
+  repository: "httpd"
   pullPolicy: IfNotPresent
   tag: "latest"
 
