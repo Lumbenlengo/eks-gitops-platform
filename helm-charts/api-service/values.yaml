@@ -1,20 +1,15 @@
 replicaCount: 2
-
 image:
   repository: "httpd"
   pullPolicy: IfNotPresent
   tag: "latest"
-
 service:
   type: ClusterIP
   port: 80
   targetPort: 80
-
-# Forçar a criação da ServiceAccount que o Deployment exige
 serviceAccount:
   create: true
   name: "api-service-sa"
-
 ingress:
   enabled: true
   className: alb
@@ -29,7 +24,6 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
-
 livenessProbe:
   httpGet:
     path: /
@@ -38,7 +32,6 @@ readinessProbe:
   httpGet:
     path: /
     port: 80
-
 resources:
   limits:
     cpu: 100m
@@ -46,6 +39,5 @@ resources:
   requests:
     cpu: 100m
     memory: 128Mi
-
 autoscaling:
   enabled: false

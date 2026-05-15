@@ -9,25 +9,6 @@ spec:
     repoURL: https://github.com/Lumbenlengo/eks-gitops-platform.git
     targetRevision: HEAD
     path: helm-charts/api-service
-    helm:
-      values: |
-        image:
-          repository: "962765734677.dkr.ecr.us-east-1.amazonaws.com/eks-gitops/api-service"
-          tag: "latest"
-        serviceAccount:
-          annotations:
-            eks.amazonaws.com/role-arn: "arn:aws:iam::962765734677:role/eks-gitops-platform-api-service"
-        ingress:
-          enabled: true
-          className: "alb"
-          annotations:
-            alb.ingress.kubernetes.io/scheme: internet-facing
-            alb.ingress.kubernetes.io/target-type: ip
-          hosts:
-            - host: "*"
-              paths:
-                - path: /
-                  pathType: Prefix
   destination:
     server: https://kubernetes.default.svc
     namespace: api-service
@@ -35,3 +16,6 @@ spec:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - Replace=true
