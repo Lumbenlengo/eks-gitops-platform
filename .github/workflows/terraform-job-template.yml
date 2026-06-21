@@ -1,0 +1,59 @@
+name: Terraform Job Template
+on:
+  workflow_call:
+    inputs:
+      layer: { type: string, required: true }
+      backend_file: { type: string, required: true }
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-terraform
+          aws-region: us-east-1
+
+      - name: Cache Terraform Plugins
+        uses: actions/cache@v4
+        with:
+          path: ~/.terraform.d/plugin-cache
+          key: ${{ runner.os }}-terraform-${{ hashFiles('**/.terraform.lock.hcl') }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with: 
+          terraform_version: "1.7.5"
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: terraform/layers/${{ inputs.layer }}
+        run: terraform init -input=false -backend-config=../../environments/prod/${{ inputs.backend_file }}
+
+      - name: Terraform Validate
+        working-directory: terraform/layers/${{ inputs.layer }}
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        working-directory: terraform/layers/${{ inputs.layer }}
+        run: |
+          terraform plan -lock-timeout=10m -input=false -out=tfplan -var-file=../../environments/prod/terraform.tfvars
+          terraform show -json tfplan > plan.json
+          # Destroy Guard: Fail if any resource is marked for deletion
+          if jq -e '.resource_changes[]? | select(.change.actions[] == "delete")' plan.json; then
+            echo "::error::Destroy operations detected in plan!"
+            exit 1
+          fi
+
+      - name: Terraform Apply
+        working-directory: terraform/layers/${{ inputs.layer }}
+        run: terraform apply -lock-timeout=10m -input=false -auto-approve tfplan
+
+      - name: Upload Terraform Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ inputs.layer }}
+          path: terraform/layers/${{ inputs.layer }}/tfplan

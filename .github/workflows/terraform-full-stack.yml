@@ -1,0 +1,56 @@
+name: "Terraform — Full Stack Deployment"
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: terraform-prod
+  cancel-in-progress: false
+
+jobs:
+  lint:
+    name: "Repository Linting"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive .
+
+  bootstrap:
+    needs: [lint]
+    uses: ./.github/workflows/terraform-job-template.yml
+    with:
+      layer: "00-bootstrap"
+      backend_file: "backend.tfvars"
+    secrets: inherit
+
+  foundation:
+    needs: [bootstrap]
+    uses: ./.github/workflows/terraform-job-template.yml
+    with:
+      layer: "01-foundation"
+      backend_file: "backend.tfvars"
+    secrets: inherit
+
+  platform:
+    needs: [foundation]
+    uses: ./.github/workflows/terraform-job-template.yml
+    with:
+      layer: "02-platform"
+      backend_file: "backend.tfvars"
+    secrets: inherit
+
+  addons:
+    needs: [platform]
+    uses: ./.github/workflows/terraform-job-template.yml
+    with:
+      layer: "03-addons"
+      backend_file: "addons.tfvars"
+    secrets: inherit
