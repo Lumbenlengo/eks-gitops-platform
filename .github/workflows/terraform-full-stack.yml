@@ -5,13 +5,8 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-permissions:
-  id-token: write
-  contents: read
-
-concurrency:
-  group: terraform-prod
-  cancel-in-progress: false
+permissions: { id-token: write, contents: read }
+concurrency: { group: terraform-prod, cancel-in-progress: false }
 
 jobs:
   lint:
@@ -20,15 +15,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
-      - name: Terraform Format Check
-        run: terraform fmt -check -recursive .
+      - run: terraform fmt -check -recursive .
 
   bootstrap:
     needs: [lint]
     uses: ./.github/workflows/terraform-job-template.yml
     with:
       layer: "00-bootstrap"
-      backend_file: "backend.tfvars"
+      tf_key: "bootstrap/terraform.tfstate"
     secrets: inherit
 
   foundation:
@@ -36,7 +30,7 @@ jobs:
     uses: ./.github/workflows/terraform-job-template.yml
     with:
       layer: "01-foundation"
-      backend_file: "backend.tfvars"
+      tf_key: "foundation/terraform.tfstate"
     secrets: inherit
 
   platform:
@@ -44,7 +38,7 @@ jobs:
     uses: ./.github/workflows/terraform-job-template.yml
     with:
       layer: "02-platform"
-      backend_file: "backend.tfvars"
+      tf_key: "platform/terraform.tfstate"
     secrets: inherit
 
   addons:
@@ -52,5 +46,5 @@ jobs:
     uses: ./.github/workflows/terraform-job-template.yml
     with:
       layer: "03-addons"
-      backend_file: "addons.tfvars"
+      tf_key: "addons/terraform.tfstate"
     secrets: inherit
