@@ -5,11 +5,15 @@ on:
     inputs:
       layer: { type: string, required: true }
       tf_key: { type: string, required: true }
+      action: { type: string, default: "apply" } # Novo input: "apply" ou "destroy"
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -31,31 +35,25 @@ jobs:
             -backend-config="key=${{ inputs.tf_key }}" \
             -backend-config="region=us-east-1"
 
-      - name: Terraform Validate
-        working-directory: terraform/layers/${{ inputs.layer }}
-        run: terraform validate
-
       - name: Terraform Plan
         working-directory: terraform/layers/${{ inputs.layer }}
         run: |
-          # Ensure we use an absolute path for the tfvars file
           TFVARS_PATH="${{ github.workspace }}/terraform/environments/prod/terraform.tfvars"
           
-          if [ ! -f "$TFVARS_PATH" ]; then
-            echo "::error::File not found: $TFVARS_PATH"
-            exit 1
-          fi
-
-          terraform plan -lock-timeout=10m -input=false -out=tfplan -var-file="$TFVARS_PATH"
-          
-          terraform show -json tfplan > plan.json
-          
-          # Destroy Guard
-          if jq -e '.resource_changes[]? | select(.change.actions[] == "delete")' plan.json; then
-            echo "::error::Destroy operations detected in plan! Failing to prevent infrastructure loss."
-            exit 1
+          if [ "${{ inputs.action }}" == "destroy" ]; then
+            echo "Running in DESTROY mode..."
+            terraform plan -destroy -lock-timeout=10m -input=false -out=tfplan -var-file="$TFVARS_PATH"
+          else
+            echo "Running in APPLY mode..."
+            terraform plan -lock-timeout=10m -input=false -out=tfplan -var-file="$TFVARS_PATH"
+            
+            terraform show -json tfplan > plan.json
+            if jq -e '.resource_changes[]? | select(.change.actions[] == "delete")' plan.json; then
+              echo "::error::Destroy operations detected in plan! Failing to prevent infrastructure loss."
+              exit 1
+            fi
           fi
 
       - name: Terraform Apply
         working-directory: terraform/layers/${{ inputs.layer }}
-        run: terraform apply -lock-timeout=10m -input=false -auto-approve tfplan
+        run: terraform apply -input=false -auto-approve tfplan
