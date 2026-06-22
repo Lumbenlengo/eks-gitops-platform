@@ -1,4 +1,5 @@
 name: Terraform Job Template
+
 on:
   workflow_call:
     inputs:
@@ -11,13 +12,16 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-terraform
           aws-region: us-east-1
 
       - uses: hashicorp/setup-terraform@v3
-        with: { terraform_version: "1.7.5", terraform_wrapper: false }
+        with: 
+          terraform_version: "1.7.5"
+          terraform_wrapper: false
 
       - name: Terraform Init
         working-directory: terraform/layers/${{ inputs.layer }}
@@ -34,10 +38,21 @@ jobs:
       - name: Terraform Plan
         working-directory: terraform/layers/${{ inputs.layer }}
         run: |
-          terraform plan -lock-timeout=10m -input=false -out=tfplan -var-file="${{ github.workspace }}/terraform/environments/prod/terraform.tfvars"
+          # Ensure we use an absolute path for the tfvars file
+          TFVARS_PATH="${{ github.workspace }}/terraform/environments/prod/terraform.tfvars"
+          
+          if [ ! -f "$TFVARS_PATH" ]; then
+            echo "::error::File not found: $TFVARS_PATH"
+            exit 1
+          fi
+
+          terraform plan -lock-timeout=10m -input=false -out=tfplan -var-file="$TFVARS_PATH"
+          
           terraform show -json tfplan > plan.json
+          
+          # Destroy Guard
           if jq -e '.resource_changes[]? | select(.change.actions[] == "delete")' plan.json; then
-            echo "::error::Destroy operations detected in plan!"
+            echo "::error::Destroy operations detected in plan! Failing to prevent infrastructure loss."
             exit 1
           fi
 
