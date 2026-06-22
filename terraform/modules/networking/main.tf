@@ -110,7 +110,7 @@ resource "aws_route_table" "private" {
   vpc_id = aws_vpc.this.id
 
   route {
-    cidr_block     = "0.0.0.0/0"
+    cidr_block = "0.0.0.0/0"
     # All private subnets use the first NAT gateway if single_nat is true
     nat_gateway_id = var.single_nat_gateway ? aws_nat_gateway.this[0].id : aws_nat_gateway.this[count.index].id
   }

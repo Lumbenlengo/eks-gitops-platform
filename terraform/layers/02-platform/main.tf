@@ -1,36 +1,3 @@
-terraform {
-  required_version = ">= 1.5"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = ">= 5.45.0" # Versão que suporta Access Entries estavelmente
-    }
-    tls = {
-      source  = "hashicorp/tls"
-      version = "~> 4.0"
-    }
-  }
-  backend "s3" {}
-}
-
-provider "aws" {
-  region = var.aws_region
-  default_tags {
-    tags = var.tags
-  }
-}
-
-data "terraform_remote_state" "foundation" {
-  backend = "s3"
-  config = {
-    bucket = "eks-gitops-platform-tfstate-962765734677"
-    key    = "foundation/terraform.tfstate"
-    region = "us-east-1"
-  }
-}
-
-data "aws_caller_identity" "current" {}
-
 module "eks" {
   source = "../../modules/eks"
 
@@ -47,7 +14,7 @@ module "eks" {
 }
 
 module "irsa" {
-  source = "../../modules/irsa"
+  source              = "../../modules/irsa"
   cluster_name        = var.cluster_name
   oidc_provider_arn   = module.eks.oidc_provider_arn
   oidc_provider_url   = module.eks.cluster_oidc_issuer_url
@@ -58,19 +25,14 @@ module "irsa" {
   depends_on          = [module.eks]
 }
 
-# ---------------------------------------------------------------------------
-# EKS Access Entry - O ARN CORRETO PARA 2026
-# ---------------------------------------------------------------------------
-
 resource "aws_eks_access_entry" "github_actions" {
-  cluster_name      = module.eks.cluster_name
-  principal_arn     = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/github-actions-terraform"
-  type              = "STANDARD"
+  cluster_name  = module.eks.cluster_name
+  principal_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/github-actions-terraform"
+  type          = "STANDARD"
 }
 
 resource "aws_eks_access_policy_association" "github_actions_admin" {
   cluster_name  = module.eks.cluster_name
-  # ATENÇÃO: ARN correto não tem "service-role"
   policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
   principal_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/github-actions-terraform"
 

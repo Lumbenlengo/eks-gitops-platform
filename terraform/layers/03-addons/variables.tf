@@ -20,15 +20,15 @@ variable "tags" {
     Layer       = "03-addons"
   }
 }
-variable "cluster_name" { 
+variable "cluster_name" {
   type    = string
-  default = "" 
+  default = ""
 }
-variable "cluster_endpoint" { 
+variable "cluster_endpoint" {
   type    = string
-  default = "" 
+  default = ""
 }
-variable "cluster_ca_cert" { 
+variable "cluster_ca_cert" {
   type    = string
-  default = "" 
+  default = ""
 }

@@ -117,11 +117,11 @@ resource "aws_security_group" "node" {
   vpc_id      = var.vpc_id
 
   ingress {
-    from_port       = 0
-    to_port         = 0
-    protocol        = "-1"
-    self            = true
-    description     = "Allow all node-to-node communication"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    self        = true
+    description = "Allow all node-to-node communication"
   }
 
   ingress {
@@ -149,8 +149,8 @@ resource "aws_security_group" "node" {
   }
 
   tags = {
-    Name                                            = "${var.cluster_name}-node-sg"
-    "kubernetes.io/cluster/${var.cluster_name}"     = "owned"
+    Name                                        = "${var.cluster_name}-node-sg"
+    "kubernetes.io/cluster/${var.cluster_name}" = "owned"
   }
 }
 
@@ -269,7 +269,7 @@ resource "aws_eks_node_group" "general" {
   node_role_arn   = aws_iam_role.node.arn
   subnet_ids      = var.private_subnet_ids
 
-  ami_type = "AL2023_x86_64_STANDARD"
+  ami_type       = "AL2023_x86_64_STANDARD"
   instance_types = ["t3.medium"]
   capacity_type  = "ON_DEMAND"
 
@@ -316,7 +316,7 @@ resource "aws_launch_template" "node" {
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required" # IMDSv2 required — blocks SSRF attacks
-    http_put_response_hop_limit = 2           # 2 required for containers
+    http_put_response_hop_limit = 2          # 2 required for containers
     instance_metadata_tags      = "enabled"
   }
 
@@ -355,9 +355,9 @@ resource "aws_launch_template" "node" {
 # ---------------------------------------------------------------------------
 
 resource "aws_eks_addon" "vpc_cni" {
-  cluster_name             = aws_eks_cluster.this.name
-  addon_name               = "vpc-cni"
-  addon_version            = "v1.16.4-eksbuild.2"
+  cluster_name                = aws_eks_cluster.this.name
+  addon_name                  = "vpc-cni"
+  addon_version               = "v1.16.4-eksbuild.2"
   resolve_conflicts_on_update = "OVERWRITE"
 
   configuration_values = jsonencode({
@@ -371,28 +371,28 @@ resource "aws_eks_addon" "vpc_cni" {
 }
 
 resource "aws_eks_addon" "coredns" {
-  cluster_name             = aws_eks_cluster.this.name
-  addon_name               = "coredns"
-  addon_version            = "v1.11.1-eksbuild.4"
+  cluster_name                = aws_eks_cluster.this.name
+  addon_name                  = "coredns"
+  addon_version               = "v1.11.1-eksbuild.4"
   resolve_conflicts_on_update = "OVERWRITE"
 
   depends_on = [aws_eks_node_group.general]
 }
 
 resource "aws_eks_addon" "kube_proxy" {
-  cluster_name             = aws_eks_cluster.this.name
-  addon_name               = "kube-proxy"
-  addon_version            = "v1.29.1-eksbuild.2"
+  cluster_name                = aws_eks_cluster.this.name
+  addon_name                  = "kube-proxy"
+  addon_version               = "v1.29.1-eksbuild.2"
   resolve_conflicts_on_update = "OVERWRITE"
 
   depends_on = [aws_eks_node_group.general]
 }
 
 resource "aws_eks_addon" "aws_ebs_csi_driver" {
-  cluster_name             = aws_eks_cluster.this.name
-  addon_name               = "aws-ebs-csi-driver"
-  addon_version            = "v1.28.0-eksbuild.1"
-  service_account_role_arn = aws_iam_role.ebs_csi.arn
+  cluster_name                = aws_eks_cluster.this.name
+  addon_name                  = "aws-ebs-csi-driver"
+  addon_version               = "v1.28.0-eksbuild.1"
+  service_account_role_arn    = aws_iam_role.ebs_csi.arn
   resolve_conflicts_on_update = "OVERWRITE"
 
   depends_on = [aws_eks_node_group.general]

@@ -188,9 +188,9 @@ resource "aws_iam_role_policy" "api_service" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "SQSSendMessage"
-        Effect = "Allow"
-        Action = ["sqs:SendMessage", "sqs:GetQueueUrl", "sqs:GetQueueAttributes"]
+        Sid      = "SQSSendMessage"
+        Effect   = "Allow"
+        Action   = ["sqs:SendMessage", "sqs:GetQueueUrl", "sqs:GetQueueAttributes"]
         Resource = aws_sqs_queue.main.arn
       },
       {
@@ -210,21 +210,21 @@ resource "aws_iam_role_policy" "api_service" {
         ]
       },
       {
-        Sid    = "KMSDecrypt"
-        Effect = "Allow"
-        Action = ["kms:Decrypt", "kms:GenerateDataKey"]
+        Sid      = "KMSDecrypt"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
         Resource = aws_kms_key.sqs.arn
       },
       {
-        Sid    = "SSMGetParameters"
-        Effect = "Allow"
-        Action = ["ssm:GetParameter", "ssm:GetParameters", "ssm:GetParametersByPath"]
+        Sid      = "SSMGetParameters"
+        Effect   = "Allow"
+        Action   = ["ssm:GetParameter", "ssm:GetParameters", "ssm:GetParametersByPath"]
         Resource = "arn:aws:ssm:${var.aws_region}:${var.account_id}:parameter/${var.cluster_name}/api-service/*"
       },
       {
-        Sid    = "SecretsManagerRead"
-        Effect = "Allow"
-        Action = ["secretsmanager:GetSecretValue"]
+        Sid      = "SecretsManagerRead"
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
         Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.account_id}:secret:${var.cluster_name}/api-service/*"
       }
     ]
@@ -300,15 +300,15 @@ resource "aws_iam_role_policy" "worker_service" {
         ]
       },
       {
-        Sid    = "KMSDecrypt"
-        Effect = "Allow"
-        Action = ["kms:Decrypt", "kms:GenerateDataKey"]
+        Sid      = "KMSDecrypt"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
         Resource = aws_kms_key.sqs.arn
       },
       {
-        Sid    = "CloudWatchMetrics"
-        Effect = "Allow"
-        Action = ["cloudwatch:PutMetricData"]
+        Sid      = "CloudWatchMetrics"
+        Effect   = "Allow"
+        Action   = ["cloudwatch:PutMetricData"]
         Resource = "*"
         Condition = {
           StringEquals = {
@@ -374,7 +374,7 @@ resource "aws_iam_role_policy" "cluster_autoscaler" {
         "eks:DescribeNodegroup"
       ]
       Resource = ["*"]
-    }, {
+      }, {
       Effect = "Allow"
       Action = [
         "autoscaling:SetDesiredCapacity",

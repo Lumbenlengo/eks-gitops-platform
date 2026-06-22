@@ -1,9 +1,7 @@
-
 # Project Metadata
 project_name = "eco-order-system"
 environment  = "prod"
-region       = "us-east-1"
-account_id   = "962765734677"
+aws_region   = "us-east-1"
 
 # EKS Cluster Configuration
 cluster_version    = "1.30"
@@ -25,6 +23,10 @@ sqs_queue_name      = "order-processing-queue"
 dynamodb_table_name = "order-storage-table"
 argocd_namespace    = "argocd"
 
+# GitHub OIDC Setup
+github_org  = "Lumbenlengo"
+github_repo = "eks-gitops-platform"
+
 # Resource Tagging
 tags = {
   Project     = "eks-gitops-platform"
@@ -32,4 +34,4 @@ tags = {
   ManagedBy   = "terraform"
   Owner       = "Patricio-Lumbenlengo"
   Mission     = "Retail-Order-Processor"
-}# Last update: May 2026
+}
