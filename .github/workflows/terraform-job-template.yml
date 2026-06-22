@@ -5,7 +5,7 @@ on:
     inputs:
       layer: { type: string, required: true }
       tf_key: { type: string, required: true }
-      action: { type: string, default: "apply" } # Novo input: "apply" ou "destroy"
+      action: { type: string, default: "apply" }
 
 jobs:
   deploy:
@@ -41,12 +41,9 @@ jobs:
           TFVARS_PATH="${{ github.workspace }}/terraform/environments/prod/terraform.tfvars"
           
           if [ "${{ inputs.action }}" == "destroy" ]; then
-            echo "Running in DESTROY mode..."
             terraform plan -destroy -lock-timeout=10m -input=false -out=tfplan -var-file="$TFVARS_PATH"
           else
-            echo "Running in APPLY mode..."
             terraform plan -lock-timeout=10m -input=false -out=tfplan -var-file="$TFVARS_PATH"
-            
             terraform show -json tfplan > plan.json
             if jq -e '.resource_changes[]? | select(.change.actions[] == "delete")' plan.json; then
               echo "::error::Destroy operations detected in plan! Failing to prevent infrastructure loss."
