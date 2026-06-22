@@ -30,7 +30,11 @@ jobs:
 
       - name: Terraform Init
         working-directory: terraform/layers/${{ inputs.layer }}
-        run: terraform init -input=false -backend-config=../../environments/prod/${{ inputs.backend_file }}
+        # Use github.workspace to ensure absolute path resolution regardless of folder depth
+        run: |
+          terraform init \
+            -input=false \
+            -backend-config="${{ github.workspace }}/terraform/environments/prod/${{ inputs.backend_file }}"
 
       - name: Terraform Validate
         working-directory: terraform/layers/${{ inputs.layer }}
@@ -39,9 +43,16 @@ jobs:
       - name: Terraform Plan
         id: plan
         working-directory: terraform/layers/${{ inputs.layer }}
+        # Use absolute path for the variable file as well
         run: |
-          terraform plan -lock-timeout=10m -input=false -out=tfplan -var-file=../../environments/prod/terraform.tfvars
+          terraform plan \
+            -lock-timeout=10m \
+            -input=false \
+            -out=tfplan \
+            -var-file="${{ github.workspace }}/terraform/environments/prod/terraform.tfvars"
+          
           terraform show -json tfplan > plan.json
+          
           # Destroy Guard: Fail if any resource is marked for deletion
           if jq -e '.resource_changes[]? | select(.change.actions[] == "delete")' plan.json; then
             echo "::error::Destroy operations detected in plan!"
