@@ -18,8 +18,13 @@ on:
           - apply
           - destroy
 
-permissions: { id-token: write, contents: read }
-concurrency: { group: terraform-prod, cancel-in-progress: false }
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: terraform-prod
+  cancel-in-progress: false
 
 jobs:
   lint:
@@ -30,7 +35,6 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
       - run: terraform fmt -check -recursive .
 
-  # Note: To run specific layers, update the 'needs' or run manually per job
   foundation:
     needs: [lint]
     uses: ./.github/workflows/terraform-job-template.yml

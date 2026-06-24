@@ -1,69 +1,59 @@
-name: "Terraform — Full Stack Deployment"
+name: "Terraform Job Template"
 
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+  workflow_call:
     inputs:
-<<<<<<< HEAD
-      layer: { type: string, required: true }
-      tf_key: { type: string, required: true }
-      action: { type: string, default: "apply" }
-=======
       layer:
-        description: 'Layer to process (e.g., 01-foundation)'
+        type: string
         required: true
-        default: '01-foundation'
+      tf_key:
+        type: string
+        required: true
       action:
-        description: 'Action to perform'
-        required: true
-        default: 'apply'
-        type: choice
-        options:
-          - apply
-          - destroy
-
-permissions: { id-token: write, contents: read }
-concurrency: { group: terraform-prod, cancel-in-progress: false }
->>>>>>> 2cfb205d40ba3e53510e35fa47e91e31d9cb5e70
+        type: string
+        default: "apply"
 
 jobs:
-  lint:
-    name: "Repository Linting"
+  terraform:
+    name: "Terraform ${{ inputs.action }} — ${{ inputs.layer }}"
     runs-on: ubuntu-latest
-<<<<<<< HEAD
     environment: production
     permissions:
       id-token: write
       contents: read
-=======
->>>>>>> 2cfb205d40ba3e53510e35fa47e91e31d9cb5e70
+
     steps:
       - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-      - run: terraform fmt -check -recursive .
 
-<<<<<<< HEAD
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+
       - name: Terraform Init
         working-directory: terraform/layers/${{ inputs.layer }}
         run: |
           terraform init -input=false \
-            -backend-config="bucket=eks-gitops-platform-tfstate-962765734677" \
+            -backend-config="bucket=eks-gitops-platform-tfstate-${{ secrets.AWS_ACCOUNT_ID }}" \
             -backend-config="key=${{ inputs.tf_key }}" \
-            -backend-config="region=us-east-1"
+            -backend-config="region=${{ secrets.AWS_REGION }}"
 
       - name: Terraform Plan
         working-directory: terraform/layers/${{ inputs.layer }}
         run: |
           TFVARS_PATH="${{ github.workspace }}/terraform/environments/prod/terraform.tfvars"
-          
+
           if [ "${{ inputs.action }}" == "destroy" ]; then
-            terraform plan -destroy -lock-timeout=10m -input=false -out=tfplan -var-file="$TFVARS_PATH"
+            terraform plan -destroy -lock-timeout=10m -input=false -out=tfplan \
+              -compact-warnings -var-file="$TFVARS_PATH"
           else
-            terraform plan -lock-timeout=10m -input=false -out=tfplan -var-file="$TFVARS_PATH"
+            terraform plan -lock-timeout=10m -input=false -out=tfplan \
+              -compact-warnings -var-file="$TFVARS_PATH"
             terraform show -json tfplan > plan.json
             if jq -e '.resource_changes[]? | select(.change.actions[] == "delete")' plan.json; then
-              echo "::error::Destroy operations detected in plan! Failing to prevent infrastructure loss."
+              echo "::error::Destroy operations detected in plan! Failing to prevent accidental deletion."
               exit 1
             fi
           fi
@@ -71,14 +61,3 @@ jobs:
       - name: Terraform Apply
         working-directory: terraform/layers/${{ inputs.layer }}
         run: terraform apply -input=false -auto-approve tfplan
-=======
-  # Note: To run specific layers, update the 'needs' or run manually per job
-  foundation:
-    needs: [lint]
-    uses: ./.github/workflows/terraform-job-template.yml
-    with:
-      layer: ${{ github.event.inputs.layer || '01-foundation' }}
-      tf_key: "foundation/terraform.tfstate"
-      action: ${{ github.event.inputs.action || 'apply' }}
-    secrets: inherit
->>>>>>> 2cfb205d40ba3e53510e35fa47e91e31d9cb5e70
