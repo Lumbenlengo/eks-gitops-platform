@@ -16,3 +16,4 @@ old_root_backup/
 *.log
 .aws/
 .env
+aws/
