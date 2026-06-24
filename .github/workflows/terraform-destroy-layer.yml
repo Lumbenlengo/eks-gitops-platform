@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       layer:
+<<<<<<< HEAD
         description: 'Camada a destruir (ex: 01-foundation)'
         required: true
         type: string
@@ -20,17 +21,65 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
       
+=======
+        description: 'Layer to destroy'
+        required: true
+        type: choice
+        options:
+          - 00-bootstrap
+          - 01-foundation
+          - 02-platform
+          - 03-addons
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: terraform-prod
+  cancel-in-progress: false
+
+jobs:
+  destroy:
+    name: "Destroy ${{ inputs.layer }}"
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+
+>>>>>>> 2cfb205d40ba3e53510e35fa47e91e31d9cb5e70
       - name: Terraform Init
         working-directory: terraform/layers/${{ inputs.layer }}
         run: |
           terraform init -input=false \
+<<<<<<< HEAD
             -backend-config="bucket=eks-gitops-platform-tfstate-962765734677" \
             -backend-config="key=${{ inputs.layer }}/terraform.tfstate" \
             -backend-config="region=us-east-1"
+=======
+            -backend-config="bucket=eks-gitops-platform-tfstate-${{ secrets.AWS_ACCOUNT_ID }}" \
+            -backend-config="key=${{ inputs.layer }}/terraform.tfstate" \
+            -backend-config="region=${{ secrets.AWS_REGION }}"
+>>>>>>> 2cfb205d40ba3e53510e35fa47e91e31d9cb5e70
 
       - name: Terraform Destroy
         working-directory: terraform/layers/${{ inputs.layer }}
         run: |
+<<<<<<< HEAD
           # Aponta diretamente para o arquivo de variáveis centralizado
           TFVARS_PATH="${{ github.workspace }}/terraform/environments/prod/terraform.tfvars"
           terraform destroy -input=false -auto-approve -var-file="$TFVARS_PATH"
+=======
+          terraform destroy \
+            -input=false \
+            -auto-approve \
+            -var-file="../../environments/prod/terraform.tfvars"
+>>>>>>> 2cfb205d40ba3e53510e35fa47e91e31d9cb5e70

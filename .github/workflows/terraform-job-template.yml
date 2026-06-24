@@ -1,32 +1,49 @@
-name: Terraform Job Template
+name: "Terraform — Full Stack Deployment"
 
 on:
-  workflow_call:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
     inputs:
+<<<<<<< HEAD
       layer: { type: string, required: true }
       tf_key: { type: string, required: true }
       action: { type: string, default: "apply" }
+=======
+      layer:
+        description: 'Layer to process (e.g., 01-foundation)'
+        required: true
+        default: '01-foundation'
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'apply'
+        type: choice
+        options:
+          - apply
+          - destroy
+
+permissions: { id-token: write, contents: read }
+concurrency: { group: terraform-prod, cancel-in-progress: false }
+>>>>>>> 2cfb205d40ba3e53510e35fa47e91e31d9cb5e70
 
 jobs:
-  deploy:
+  lint:
+    name: "Repository Linting"
     runs-on: ubuntu-latest
+<<<<<<< HEAD
     environment: production
     permissions:
       id-token: write
       contents: read
+=======
+>>>>>>> 2cfb205d40ba3e53510e35fa47e91e31d9cb5e70
     steps:
       - uses: actions/checkout@v4
-
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-terraform
-          aws-region: us-east-1
-
       - uses: hashicorp/setup-terraform@v3
-        with: 
-          terraform_version: "1.7.5"
-          terraform_wrapper: false
+      - run: terraform fmt -check -recursive .
 
+<<<<<<< HEAD
       - name: Terraform Init
         working-directory: terraform/layers/${{ inputs.layer }}
         run: |
@@ -54,3 +71,14 @@ jobs:
       - name: Terraform Apply
         working-directory: terraform/layers/${{ inputs.layer }}
         run: terraform apply -input=false -auto-approve tfplan
+=======
+  # Note: To run specific layers, update the 'needs' or run manually per job
+  foundation:
+    needs: [lint]
+    uses: ./.github/workflows/terraform-job-template.yml
+    with:
+      layer: ${{ github.event.inputs.layer || '01-foundation' }}
+      tf_key: "foundation/terraform.tfstate"
+      action: ${{ github.event.inputs.action || 'apply' }}
+    secrets: inherit
+>>>>>>> 2cfb205d40ba3e53510e35fa47e91e31d9cb5e70
