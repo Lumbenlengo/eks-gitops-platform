@@ -1,0 +1,14 @@
+[
+  { "id": "p1",  "name": "Wireless Earbuds Pro",      "sku": "WEP-2201", "category": "Audio",       "price": 129.90, "stock": 412, "badge": "New" },
+  { "id": "p2",  "name": "Smart Home Hub Mini",       "sku": "SHH-1180", "category": "Home",        "price": 89.50,  "stock": 12 },
+  { "id": "p3",  "name": "Organic Cotton Tee",        "sku": "OCT-330M", "category": "Apparel",     "price": 39.00,  "stock": 0 },
+  { "id": "p4",  "name": "Mechanical Keyboard RGB",    "sku": "MKB-7750", "category": "Electronics", "price": 249.00, "stock": 268 },
+  { "id": "p5",  "name": "Premium Yoga Mat",           "sku": "YMP-4410", "category": "Fitness",     "price": 79.90,  "stock": 34 },
+  { "id": "p6",  "name": "Insulated Steel Bottle 1L",  "sku": "GTI-9043", "category": "Home",        "price": 34.90,  "stock": 187 },
+  { "id": "p7",  "name": "Travel Backpack Pro",        "sku": "TBP-5512", "category": "Accessories", "price": 159.00, "stock": 56,  "badge": "Best Seller" },
+  { "id": "p8",  "name": "Mini Bluetooth Speaker",     "sku": "MBS-3309", "category": "Audio",       "price": 64.90,  "stock": 142 },
+  { "id": "p9",  "name": "Leather Wallet",             "sku": "LWT-8821", "category": "Accessories", "price": 89.00,  "stock": 73 },
+  { "id": "p10", "name": "LED Desk Lamp",              "sku": "LDL-2247", "category": "Office",      "price": 54.50,  "stock": 98 },
+  { "id": "p11", "name": "Running Shoes Air",          "sku": "RSA-6634", "category": "Apparel",     "price": 219.90, "stock": 41 },
+  { "id": "p12", "name": "Noise-Cancelling Headset",   "sku": "NCH-9901", "category": "Audio",       "price": 179.00, "original_price": 209.00, "stock": 27, "badge": "Sale -15%" }
+]

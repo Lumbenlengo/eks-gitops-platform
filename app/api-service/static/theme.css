@@ -1,0 +1,53 @@
+/* =============================================================================
+   NORTHSTAR — shared theme
+   Design tokens, base resets, and rules common to both the storefront
+   (/) and the operations center (/ops). Page-specific layout, components,
+   and animations remain in each page's own <style> block.
+   ============================================================================= */
+
+:root{
+  --bg: #0a0d14;
+  --surface: #121826;
+  --surface-2: #1a2233;
+  --border: #232c3f;
+  --text: #edf1f7;
+  --text-dim: #8b93a6;
+  --text-faint: #515a70;
+  --teal: #2dd4bf;
+  --teal-dim: rgba(45,212,191,.12);
+  --amber: #f5a623;
+  --amber-dim: rgba(245,166,35,.12);
+  --coral: #f2545b;
+  --coral-dim: rgba(242,84,91,.12);
+  --indigo: #7c8cff;
+  --indigo-dim: rgba(124,140,255,.12);
+  --green: #34d399;
+  --pink: #f472b6;
+  --pink-dim: rgba(244,114,182,.12);
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+*{margin:0; padding:0; box-sizing:border-box;}
+
+html,body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font-body);
+  -webkit-font-smoothing:antialiased;
+}
+
+a{color:inherit;}
+img,svg{display:block;}
+
+/* shared "live" status dot, used in topnav/hero (storefront) and
+   topbar/cards (ops center) */
+.status-dot{
+  width:7px; height:7px; border-radius:50%;
+  background:var(--green);
+}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation:none !important; transition:none !important;}
+}

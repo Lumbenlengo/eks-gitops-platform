@@ -1,0 +1,36 @@
+name: "Terraform Destroy Layer"
+
+on:
+  workflow_dispatch:
+    inputs:
+      layer:
+        description: 'Camada a destruir (ex: 01-foundation)'
+        required: true
+        type: string
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-terraform
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+      
+      - name: Terraform Init
+        working-directory: terraform/layers/${{ inputs.layer }}
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=eks-gitops-platform-tfstate-962765734677" \
+            -backend-config="key=${{ inputs.layer }}/terraform.tfstate" \
+            -backend-config="region=us-east-1"
+
+      - name: Terraform Destroy
+        working-directory: terraform/layers/${{ inputs.layer }}
+        run: |
+          # Aponta diretamente para o arquivo de variáveis centralizado
+          TFVARS_PATH="${{ github.workspace }}/terraform/environments/prod/terraform.tfvars"
+          terraform destroy -input=false -auto-approve -var-file="$TFVARS_PATH"

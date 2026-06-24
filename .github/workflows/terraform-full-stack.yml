@@ -4,6 +4,19 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      layer:
+        description: 'Layer to process (e.g., 01-foundation)'
+        required: true
+        default: '01-foundation'
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'apply'
+        type: choice
+        options:
+          - apply
+          - destroy
 
 permissions: { id-token: write, contents: read }
 concurrency: { group: terraform-prod, cancel-in-progress: false }
@@ -17,34 +30,12 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
       - run: terraform fmt -check -recursive .
 
-  bootstrap:
+  # Note: To run specific layers, update the 'needs' or run manually per job
+  foundation:
     needs: [lint]
     uses: ./.github/workflows/terraform-job-template.yml
     with:
-      layer: "00-bootstrap"
-      tf_key: "bootstrap/terraform.tfstate"
-    secrets: inherit
-
-  foundation:
-    needs: [bootstrap]
-    uses: ./.github/workflows/terraform-job-template.yml
-    with:
-      layer: "01-foundation"
+      layer: ${{ github.event.inputs.layer || '01-foundation' }}
       tf_key: "foundation/terraform.tfstate"
-    secrets: inherit
-
-  platform:
-    needs: [foundation]
-    uses: ./.github/workflows/terraform-job-template.yml
-    with:
-      layer: "02-platform"
-      tf_key: "platform/terraform.tfstate"
-    secrets: inherit
-
-  addons:
-    needs: [platform]
-    uses: ./.github/workflows/terraform-job-template.yml
-    with:
-      layer: "03-addons"
-      tf_key: "addons/terraform.tfstate"
+      action: ${{ github.event.inputs.action || 'apply' }}
     secrets: inherit

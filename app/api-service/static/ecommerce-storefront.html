@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NORTHSTAR Store — Smart gear for everyday life</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/theme.css">
+<link rel="stylesheet" href="/static/storefront.css">
+</head>
+<body>
+
+<!-- icon sprite -->
+<svg style="display:none">
+  <symbol id="i-cart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/>
+  </symbol>
+  <symbol id="i-bag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 2 3 7v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-3-5Z"/><path d="M3 7h18"/><path d="M16 11a4 4 0 0 1-8 0"/>
+  </symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+  </symbol>
+  <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+  </symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+  </symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="5" y1="12" x2="19" y2="12"/>
+  </symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+  </symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+  </symbol>
+  <symbol id="i-headphones" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 16v-4a9 9 0 0 1 18 0v4"/><rect x="3" y="14" width="5" height="7" rx="2"/><rect x="16" y="14" width="5" height="7" rx="2"/>
+  </symbol>
+  <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>
+  </symbol>
+  <symbol id="i-activity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+  </symbol>
+  <symbol id="i-shirt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 3 4 7l3 3 1-1v11h8V9l1 1 3-3-4-4-2 2h-4z"/>
+  </symbol>
+  <symbol id="i-lamp" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.5c.7.7 1 1.6 1 2.5h6c0-.9.3-1.8 1-2.5A7 7 0 0 0 12 2z"/>
+  </symbol>
+  <symbol id="i-server" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/>
+    <path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/>
+  </symbol>
+</svg>
+
+<!-- TOPNAV -->
+<nav class="topnav">
+  <div class="topnav-left">
+    <svg class="logo-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+      <circle cx="12" cy="12" r="9.5"/>
+      <circle cx="12" cy="12" r="5.5" stroke-dasharray="2 2.5"/>
+      <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/>
+    </svg>
+    <div class="brand">NORTH<span>STAR</span></div>
+    <div class="brand-tag">Store</div>
+  </div>
+  <div class="topnav-right">
+    <div class="search-wrap">
+      <svg><use href="#i-search"/></svg>
+      <input type="text" id="searchInput" placeholder="Search products...">
+    </div>
+    <a class="ops-link" href="/ops">Operations Center ↗</a>
+    <button class="cart-btn" id="cartBtn" aria-label="Open cart">
+      <svg><use href="#i-cart"/></svg>
+      <span class="cart-badge" id="cartBadge">0</span>
+    </button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-eyebrow"><span class="status-dot" style="width:6px;height:6px;border-radius:50%;background:var(--teal);"></span>New season drop · 12 products</div>
+    <h1>Smart gear for <span>everyday life.</span></h1>
+    <p>Thoughtfully designed audio, home, fitness and travel essentials — built to last, priced fairly, shipped fast. Built as a demo storefront for the NORTHSTAR platform.</p>
+    <div class="hero-actions">
+      <a class="btn-primary" href="#products">Shop the collection <svg><use href="#i-arrow-right"/></svg></a>
+      <a class="btn-secondary" href="/ops">View the Operations Center →</a>
+    </div>
+    <div class="trust-row">
+      <div class="trust-item"><span class="dot"></span>Free shipping over $50</div>
+      <div class="trust-item"><span class="dot"></span>30-day returns</div>
+      <div class="trust-item"><span class="dot"></span>Secure checkout</div>
+      <div class="trust-item"><span class="dot"></span>24/7 support</div>
+    </div>
+  </div>
+</section>
+
+<!-- CATEGORY BAR -->
+<div class="cat-bar" id="catBar">
+  <button class="cat-pill active" data-cat="All">All</button>
+  <button class="cat-pill" data-cat="Audio">Audio</button>
+  <button class="cat-pill" data-cat="Home">Home</button>
+  <button class="cat-pill" data-cat="Fitness">Fitness</button>
+  <button class="cat-pill" data-cat="Apparel">Apparel</button>
+  <button class="cat-pill" data-cat="Accessories">Accessories</button>
+  <button class="cat-pill" data-cat="Office">Office</button>
+  <button class="cat-pill" data-cat="Electronics">Electronics</button>
+</div>
+
+<!-- PRODUCTS -->
+<section class="products-section" id="products">
+  <div class="section-head">
+    <div class="section-title">All products</div>
+    <div class="section-sub" id="resultsCount">12 items</div>
+  </div>
+  <div class="products-grid" id="productsGrid"></div>
+</section>
+
+<!-- FOOTER -->
+<footer class="site-footer">
+  <div>© 2026 NORTHSTAR Store — demo storefront, all data is simulated.</div>
+  <a href="/ops">Operations Center ↗</a>
+</footer>
+
+<!-- CART OVERLAY + DRAWER -->
+<div class="overlay" id="cartOverlay"></div>
+<aside class="cart-drawer" id="cartDrawer">
+  <div class="cart-head">
+    <h2>Your cart</h2>
+    <button class="icon-close" id="closeCart"><svg><use href="#i-x"/></svg></button>
+  </div>
+  <div class="cart-items" id="cartItems"></div>
+  <div class="cart-summary">
+    <div class="summary-line"><span>Subtotal</span><span class="val" id="sumSubtotal">$0.00</span></div>
+    <div class="summary-line"><span>Shipping</span><span class="val" id="sumShipping">$0.00</span></div>
+    <div class="summary-line total"><span>Total</span><span class="val" id="sumTotal">$0.00</span></div>
+    <button class="checkout-btn" id="checkoutBtn" disabled>Checkout</button>
+  </div>
+</aside>
+
+<!-- CHECKOUT MODAL -->
+<div class="modal-overlay" id="checkoutOverlay">
+  <div class="modal">
+    <div class="form-view" id="formView">
+      <div class="modal-head">
+        <h2>Checkout</h2>
+        <button class="icon-close" id="closeCheckout"><svg><use href="#i-x"/></svg></button>
+      </div>
+      <form id="checkoutForm">
+        <div class="field"><label>Full name</label><input type="text" required placeholder="Jane Doe"></div>
+        <div class="field"><label>Email</label><input type="email" required placeholder="jane@example.com"></div>
+        <div class="field"><label>Address</label><input type="text" required placeholder="123 Main St"></div>
+        <div class="field-row">
+          <div class="field"><label>City</label><input type="text" required placeholder="Lyon"></div>
+          <div class="field"><label>Country</label>
+            <select>
+              <option>France</option><option>United States</option><option>Brazil</option>
+              <option>Germany</option><option>Japan</option><option>Canada</option><option>Spain</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>Card number</label><input type="text" required placeholder="4242 4242 4242 4242" maxlength="19" id="cardInput"></div>
+        <div class="field-row">
+          <div class="field"><label>Expiry</label><input type="text" required placeholder="MM/YY" maxlength="5"></div>
+          <div class="field"><label>CVC</label><input type="text" required placeholder="123" maxlength="3"></div>
+        </div>
+        <div class="modal-summary" id="modalSummary"></div>
+        <button class="submit-btn" id="submitBtn" type="submit">Place order</button>
+      </form>
+    </div>
+    <div class="success-view" id="successView">
+      <div class="success-icon"><svg><use href="#i-check"/></svg></div>
+      <h3>Order placed!</h3>
+      <p>Thanks for shopping with NORTHSTAR. A confirmation has been "sent" to your inbox.</p>
+      <div class="order-id" id="orderId">#NS-000000</div>
+      <button class="btn-primary" id="continueBtn" style="width:100%; justify-content:center;">Continue shopping</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOASTS -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+  // ---------- catalog ----------
+  const catalog = [
+    { id:'p1',  name:'Wireless Earbuds Pro',     category:'Audio',       price:129.90, stock:412, icon:'i-headphones', cat:'cat-audio',       badge:{label:'New', cls:'badge-new'} },
+    { id:'p2',  name:'Smart Home Hub Mini',      category:'Home',        price:89.50,  stock:12,  icon:'i-home',       cat:'cat-home' },
+    { id:'p3',  name:'Organic Cotton Tee',       category:'Apparel',     price:39.00,  stock:0,   icon:'i-shirt',      cat:'cat-apparel' },
+    { id:'p4',  name:'Mechanical Keyboard RGB',  category:'Electronics', price:249.00, stock:268, icon:'i-server',     cat:'cat-electronics' },
+    { id:'p5',  name:'Premium Yoga Mat',         category:'Fitness',     price:79.90,  stock:34,  icon:'i-activity',   cat:'cat-fitness' },
+    { id:'p6',  name:'Insulated Steel Bottle 1L',category:'Home',        price:34.90,  stock:187, icon:'i-home',       cat:'cat-home' },
+    { id:'p7',  name:'Travel Backpack Pro',      category:'Accessories', price:159.00, stock:56,  icon:'i-bag',        cat:'cat-accessories', badge:{label:'Best Seller', cls:'badge-best'} },
+    { id:'p8',  name:'Mini Bluetooth Speaker',   category:'Audio',       price:64.90,  stock:142, icon:'i-headphones', cat:'cat-audio' },
+    { id:'p9',  name:'Leather Wallet',           category:'Accessories', price:89.00,  stock:73,  icon:'i-bag',        cat:'cat-accessories' },
+    { id:'p10', name:'LED Desk Lamp',            category:'Office',      price:54.50,  stock:98,  icon:'i-lamp',       cat:'cat-office' },
+    { id:'p11', name:'Running Shoes Air',        category:'Apparel',     price:219.90, stock:41,  icon:'i-shirt',      cat:'cat-apparel' },
+    { id:'p12', name:'Noise-Cancelling Headset', category:'Audio',       price:179.00, originalPrice:209.00, stock:27, icon:'i-headphones', cat:'cat-audio', badge:{label:'Sale -15%', cls:'badge-sale'} },
+  ];
+
+  let cart = {}; // id -> qty
+  let activeCategory = 'All';
+  let searchQuery = '';
+
+  const fmt = (n) => '$' + n.toFixed(2);
+
+  // ---------- render products ----------
+  const grid = document.getElementById('productsGrid');
+  const resultsCount = document.getElementById('resultsCount');
+
+  function renderProducts(){
+    const filtered = catalog.filter(p => {
+      const inCat = activeCategory === 'All' || p.category === activeCategory;
+      const inSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+      return inCat && inSearch;
+    });
+    resultsCount.textContent = filtered.length + (filtered.length === 1 ? ' item' : ' items');
+    grid.innerHTML = filtered.map(p => {
+      const stockClass = p.stock === 0 ? 'out' : (p.stock < 50 ? 'low' : '');
+      const stockText = p.stock === 0 ? 'Out of stock' : (p.stock < 50 ? `Only ${p.stock} left` : `${p.stock} in stock`);
+      const badge = p.badge ? `<span class="product-badge ${p.badge.cls}">${p.badge.label}</span>` : '';
+      const oldPrice = p.originalPrice ? `<span class="price-old">${fmt(p.originalPrice)}</span>` : '';
+      const disabled = p.stock === 0 ? 'disabled' : '';
+      const btnLabel = p.stock === 0 ? 'Sold out' : 'Add to cart';
+      return `
+        <div class="product-card">
+          <div class="product-visual ${p.cat}">
+            ${badge}
+            <svg viewBox="0 0 24 24"><use href="#${p.icon}"/></svg>
+          </div>
+          <div class="product-body">
+            <div class="product-category">${p.category}</div>
+            <div class="product-name">${p.name}</div>
+            <div class="product-stock ${stockClass}">${stockText}</div>
+            <div class="product-footer">
+              <div class="price-wrap">${oldPrice}<span class="price">${fmt(p.price)}</span></div>
+              <button class="add-btn" data-id="${p.id}" ${disabled}>${btnLabel}</button>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    grid.querySelectorAll('.add-btn:not([disabled])').forEach(btn => {
+      btn.addEventListener('click', () => addToCart(btn.dataset.id, btn));
+    });
+  }
+
+  document.querySelectorAll('.cat-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      activeCategory = pill.dataset.cat;
+      renderProducts();
+    });
+  });
+
+  document.getElementById('searchInput').addEventListener('input', (e) => {
+    searchQuery = e.target.value;
+    renderProducts();
+  });
+
+  // ---------- cart engine ----------
+  const cartBadge = document.getElementById('cartBadge');
+  const cartItems = document.getElementById('cartItems');
+  const cartDrawer = document.getElementById('cartDrawer');
+  const cartOverlay = document.getElementById('cartOverlay');
+  const checkoutBtn = document.getElementById('checkoutBtn');
+
+  function addToCart(id, btn){
+    cart[id] = (cart[id] || 0) + 1;
+    renderCart();
+    if (btn){
+      const original = btn.textContent;
+      btn.textContent = 'Added ✓';
+      btn.classList.add('added');
+      setTimeout(() => { btn.textContent = original; btn.classList.remove('added'); }, 900);
+    }
+  }
+  function changeQty(id, delta){
+    cart[id] = (cart[id] || 0) + delta;
+    if (cart[id] <= 0) delete cart[id];
+    renderCart();
+  }
+  function removeFromCart(id){
+    delete cart[id];
+    renderCart();
+  }
+  function getCount(){ return Object.values(cart).reduce((a,b) => a+b, 0); }
+  function getSubtotal(){
+    return Object.entries(cart).reduce((sum,[id,qty]) => {
+      const p = catalog.find(p => p.id === id);
+      return sum + (p ? p.price * qty : 0);
+    }, 0);
+  }
+
+  function renderCart(){
+    const count = getCount();
+    cartBadge.textContent = count;
+    const subtotal = getSubtotal();
+    const shipping = count === 0 ? 0 : (subtotal >= 50 ? 0 : 4.99);
+    const total = subtotal + shipping;
+
+    document.getElementById('sumSubtotal').textContent = fmt(subtotal);
+    document.getElementById('sumShipping').textContent = shipping === 0 ? 'Free' : fmt(shipping);
+    document.getElementById('sumTotal').textContent = fmt(total);
+    checkoutBtn.disabled = count === 0;
+
+    if (count === 0){
+      cartItems.innerHTML = `
+        <div class="cart-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><use href="#i-cart"/></svg>
+          <div>Your cart is empty.<br>Browse the collection and add something nice.</div>
+        </div>`;
+      return;
+    }
+
+    cartItems.innerHTML = Object.entries(cart).map(([id, qty]) => {
+      const p = catalog.find(p => p.id === id);
+      return `
+        <div class="cart-row">
+          <div class="cart-row-visual ${p.cat}"><svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2"><use href="#${p.icon}"/></svg></div>
+          <div class="cart-row-info">
+            <div class="cart-row-name">${p.name}</div>
+            <div class="cart-row-price">${fmt(p.price)} each</div>
+          </div>
+          <div class="qty-stepper">
+            <button class="qty-btn" data-act="dec" data-id="${id}"><svg viewBox="0 0 24 24"><use href="#i-minus"/></svg></button>
+            <span class="qty-val">${qty}</span>
+            <button class="qty-btn" data-act="inc" data-id="${id}"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg></button>
+          </div>
+          <button class="cart-row-remove" data-act="remove" data-id="${id}"><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button>
+        </div>`;
+    }).join('');
+
+    cartItems.querySelectorAll('[data-act]').forEach(el => {
+      el.addEventListener('click', () => {
+        const id = el.dataset.id;
+        if (el.dataset.act === 'inc') changeQty(id, 1);
+        else if (el.dataset.act === 'dec') changeQty(id, -1);
+        else if (el.dataset.act === 'remove') removeFromCart(id);
+      });
+    });
+  }
+
+  // ---------- drawer open/close ----------
+  function openCart(){ cartDrawer.classList.add('open'); cartOverlay.classList.add('show'); }
+  function closeCartDrawer(){ cartDrawer.classList.remove('open'); cartOverlay.classList.remove('show'); }
+  document.getElementById('cartBtn').addEventListener('click', openCart);
+  document.getElementById('closeCart').addEventListener('click', closeCartDrawer);
+  cartOverlay.addEventListener('click', closeCartDrawer);
+
+  // ---------- checkout modal ----------
+  const checkoutOverlay = document.getElementById('checkoutOverlay');
+  const formView = document.getElementById('formView');
+  const successView = document.getElementById('successView');
+  const submitBtn = document.getElementById('submitBtn');
+
+  checkoutBtn.addEventListener('click', () => {
+    if (getCount() === 0) return;
+    closeCartDrawer();
+    renderModalSummary();
+    formView.classList.remove('hide');
+    successView.classList.remove('show');
+    checkoutOverlay.classList.add('show');
+  });
+  document.getElementById('closeCheckout').addEventListener('click', () => checkoutOverlay.classList.remove('show'));
+  checkoutOverlay.addEventListener('click', (e) => { if (e.target === checkoutOverlay) checkoutOverlay.classList.remove('show'); });
+
+  function renderModalSummary(){
+    const subtotal = getSubtotal();
+    const shipping = subtotal >= 50 ? 0 : 4.99;
+    const total = subtotal + shipping;
+    const lines = Object.entries(cart).map(([id, qty]) => {
+      const p = catalog.find(p => p.id === id);
+      return `<div class="row"><span>${qty} × ${p.name}</span><span>${fmt(p.price * qty)}</span></div>`;
+    }).join('');
+    document.getElementById('modalSummary').innerHTML = `
+      ${lines}
+      <div class="row"><span>Shipping</span><span>${shipping === 0 ? 'Free' : fmt(shipping)}</span></div>
+      <div class="row total"><span>Total</span><span>${fmt(total)}</span></div>
+    `;
+  }
+
+  // card number formatting (decorative)
+  document.getElementById('cardInput').addEventListener('input', (e) => {
+    let v = e.target.value.replace(/\D/g,'').slice(0,16);
+    e.target.value = v.replace(/(.{4})/g,'$1 ').trim();
+  });
+
+  // ---------- live sales broadcast ----------
+  let bc = null;
+  try { bc = new BroadcastChannel('northstar-orders'); } catch(e) {}
+
+  document.getElementById('checkoutForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span class="spinner"></span> Processing...`;
+
+    setTimeout(() => {
+      const orderId = '#NS-' + Math.floor(100000 + Math.random()*900000);
+      document.getElementById('orderId').textContent = orderId;
+
+      // broadcast each line item to the Operations Center live feed
+      if (bc){
+        Object.entries(cart).forEach(([id, qty]) => {
+          const p = catalog.find(p => p.id === id);
+          for (let i=0;i<qty;i++){
+            bc.postMessage({ name: p.name, price: p.price, city: 'Storefront checkout' });
+          }
+        });
+      }
+
+      formView.classList.add('hide');
+      successView.classList.add('show');
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = 'Place order';
+    }, 1300);
+  });
+
+  document.getElementById('continueBtn').addEventListener('click', () => {
+    cart = {};
+    renderCart();
+    checkoutOverlay.classList.remove('show');
+  });
+
+  // ---------- live sales toasts ----------
+  const toastNames = catalog.map(p => p.name);
+  const toastCities = ['São Paulo, Brazil','Lyon, France','Austin, USA','Berlin, Germany','Tokyo, Japan','Toronto, Canada','Madrid, Spain','Mumbai, India','Sydney, Australia','Amsterdam, Netherlands'];
+  const toastContainer = document.getElementById('toastContainer');
+
+  function showToast(){
+    const name = toastNames[Math.floor(Math.random()*toastNames.length)];
+    const city = toastCities[Math.floor(Math.random()*toastCities.length)];
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerHTML = `<span class="toast-dot"></span><span>Someone in <strong>${city}</strong> just bought <strong>${name}</strong></span>`;
+    toastContainer.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('show'));
+    setTimeout(() => {
+      toast.classList.remove('show');
+      setTimeout(() => toast.remove(), 400);
+    }, 4200);
+  }
+  setTimeout(showToast, 2000);
+  setInterval(showToast, 7000);
+
+  // ---------- init ----------
+  renderProducts();
+  renderCart();
+</script>
+</body>
+</html>
