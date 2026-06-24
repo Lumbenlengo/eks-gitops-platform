@@ -111,12 +111,15 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add helm-charts/api-service/values.yaml
-          git diff --staged --quiet || git commit -m "chore: api-service image → ${{ github.sha }}"
-          git push
+          git diff --staged --quiet || (
+            git commit -m "chore: api-service image → ${{ github.sha }}" &&
+            git pull --rebase origin main &&
+            git push
+          )
 
   docker-worker:
     name: "Docker — worker-service"
-    needs: [addons]
+    needs: [docker-api]  
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -154,12 +157,15 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add helm-charts/worker-service/values.yaml
-          git diff --staged --quiet || git commit -m "chore: worker-service image → ${{ github.sha }}"
-          git push
+          git diff --staged --quiet || (
+            git commit -m "chore: worker-service image → ${{ github.sha }}" &&
+            git pull --rebase origin main &&
+            git push
+          )
 
   argocd-sync:
     name: "ArgoCD Sync"
-    needs: [docker-api, docker-worker]
+    needs: [docker-worker] 
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
