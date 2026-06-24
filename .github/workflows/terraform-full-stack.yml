@@ -16,16 +16,13 @@ on:
 
 permissions:
   id-token: write
-  contents: write   # needed to commit updated helm values
+  contents: write
 
 concurrency:
   group: terraform-prod
   cancel-in-progress: false
 
 jobs:
-  # ─────────────────────────────────────────
-  # 1. LINT
-  # ─────────────────────────────────────────
   lint:
     name: "Lint"
     runs-on: ubuntu-latest
@@ -34,9 +31,6 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
       - run: terraform fmt -check -recursive .
 
-  # ─────────────────────────────────────────
-  # 2. TERRAFORM LAYERS (sequential)
-  # ─────────────────────────────────────────
   bootstrap:
     name: "Terraform — 00-bootstrap"
     needs: [lint]
@@ -77,9 +71,6 @@ jobs:
       action: ${{ github.event.inputs.action || 'apply' }}
     secrets: inherit
 
-  # ─────────────────────────────────────────
-  # 3. DOCKER BUILD & PUSH (parallel, after infra)
-  # ─────────────────────────────────────────
   docker-api:
     name: "Docker — api-service"
     needs: [addons]
@@ -166,9 +157,6 @@ jobs:
           git diff --staged --quiet || git commit -m "chore: worker-service image → ${{ github.sha }}"
           git push
 
-  # ─────────────────────────────────────────
-  # 4. ARGOCD SYNC (after both docker jobs)
-  # ─────────────────────────────────────────
   argocd-sync:
     name: "ArgoCD Sync"
     needs: [docker-api, docker-worker]
@@ -191,8 +179,4 @@ jobs:
         run: kubectl apply -f argocd/projects/
 
       - name: Apply ArgoCD apps
-<<<<<<< HEAD
         run: kubectl apply -f argocd/apps/
-=======
-        run: kubectl apply -f argocd/apps/
->>>>>>> 869cf10cab3e6e989ed1b69ba3b093d5ad9dd55c
