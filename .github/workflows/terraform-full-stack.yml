@@ -1,16 +1,12 @@
-name: "Terraform — Full Stack Deployment"
+name: "Full Stack Deployment"
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
     inputs:
-      layer:
-        description: 'Layer to process (e.g., 01-foundation)'
-        required: true
-        default: '01-foundation'
       action:
-        description: 'Action to perform'
+        description: 'Terraform action'
         required: true
         default: 'apply'
         type: choice
@@ -20,26 +16,179 @@ on:
 
 permissions:
   id-token: write
-  contents: read
+  contents: write   # needed to commit updated helm values
 
 concurrency:
   group: terraform-prod
   cancel-in-progress: false
 
 jobs:
+  # ─────────────────────────────────────────
+  # 1. LINT
+  # ─────────────────────────────────────────
   lint:
-    name: "Repository Linting"
+    name: "Lint"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
       - run: terraform fmt -check -recursive .
 
-  foundation:
+  # ─────────────────────────────────────────
+  # 2. TERRAFORM LAYERS (sequential)
+  # ─────────────────────────────────────────
+  bootstrap:
+    name: "Terraform — 00-bootstrap"
     needs: [lint]
     uses: ./.github/workflows/terraform-job-template.yml
     with:
-      layer: ${{ github.event.inputs.layer || '01-foundation' }}
+      layer: "00-bootstrap"
+      tf_key: "bootstrap/terraform.tfstate"
+      action: ${{ github.event.inputs.action || 'apply' }}
+    secrets: inherit
+
+  foundation:
+    name: "Terraform — 01-foundation"
+    needs: [bootstrap]
+    uses: ./.github/workflows/terraform-job-template.yml
+    with:
+      layer: "01-foundation"
       tf_key: "foundation/terraform.tfstate"
       action: ${{ github.event.inputs.action || 'apply' }}
     secrets: inherit
+
+  platform:
+    name: "Terraform — 02-platform"
+    needs: [foundation]
+    uses: ./.github/workflows/terraform-job-template.yml
+    with:
+      layer: "02-platform"
+      tf_key: "platform/terraform.tfstate"
+      action: ${{ github.event.inputs.action || 'apply' }}
+    secrets: inherit
+
+  addons:
+    name: "Terraform — 03-addons"
+    needs: [platform]
+    uses: ./.github/workflows/terraform-job-template.yml
+    with:
+      layer: "03-addons"
+      tf_key: "addons/terraform.tfstate"
+      action: ${{ github.event.inputs.action || 'apply' }}
+    secrets: inherit
+
+  # ─────────────────────────────────────────
+  # 3. DOCKER BUILD & PUSH (parallel, after infra)
+  # ─────────────────────────────────────────
+  docker-api:
+    name: "Docker — api-service"
+    needs: [addons]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & Push api-service
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPO: ${{ secrets.ECR_REPOSITORY_API }}
+          TAG: ${{ github.sha }}
+        run: |
+          docker build -t $REGISTRY/$REPO:$TAG -t $REGISTRY/$REPO:latest app/api-service
+          docker push $REGISTRY/$REPO:$TAG
+          docker push $REGISTRY/$REPO:latest
+
+      - name: Update api-service Helm values
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPO: ${{ secrets.ECR_REPOSITORY_API }}
+          TAG: ${{ github.sha }}
+        run: |
+          sed -i "s|repository:.*|repository: $REGISTRY/$REPO|" helm-charts/api-service/values.yaml
+          sed -i "s|tag:.*|tag: \"$TAG\"|"                      helm-charts/api-service/values.yaml
+
+      - name: Commit Helm values
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add helm-charts/api-service/values.yaml
+          git diff --staged --quiet || git commit -m "chore: api-service image → ${{ github.sha }}"
+          git push
+
+  docker-worker:
+    name: "Docker — worker-service"
+    needs: [addons]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & Push worker-service
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPO: ${{ secrets.ECR_REPOSITORY_WORKER }}
+          TAG: ${{ github.sha }}
+        run: |
+          docker build -t $REGISTRY/$REPO:$TAG -t $REGISTRY/$REPO:latest app/worker-service
+          docker push $REGISTRY/$REPO:$TAG
+          docker push $REGISTRY/$REPO:latest
+
+      - name: Update worker-service Helm values
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPO: ${{ secrets.ECR_REPOSITORY_WORKER }}
+          TAG: ${{ github.sha }}
+        run: |
+          sed -i "s|repository:.*|repository: $REGISTRY/$REPO|" helm-charts/worker-service/values.yaml
+          sed -i "s|tag:.*|tag: \"$TAG\"|"                      helm-charts/worker-service/values.yaml
+
+      - name: Commit Helm values
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add helm-charts/worker-service/values.yaml
+          git diff --staged --quiet || git commit -m "chore: worker-service image → ${{ github.sha }}"
+          git push
+
+  # ─────────────────────────────────────────
+  # 4. ARGOCD SYNC (after both docker jobs)
+  # ─────────────────────────────────────────
+  argocd-sync:
+    name: "ArgoCD Sync"
+    needs: [docker-api, docker-worker]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Get EKS kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name ${{ secrets.EKS_CLUSTER_NAME }} \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Apply ArgoCD projects
+        run: kubectl apply -f argocd/projects/
+
+      - name: Apply ArgoCD apps
+        run: kubectl apply -f argocd/apps/
