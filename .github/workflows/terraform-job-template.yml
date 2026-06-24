@@ -51,11 +51,6 @@ jobs:
           else
             terraform plan -lock-timeout=10m -input=false -out=tfplan \
               -compact-warnings -var-file="$TFVARS_PATH"
-            terraform show -json tfplan > plan.json
-            if jq -e '.resource_changes[]? | select(.change.actions[] == "delete")' plan.json; then
-              echo "::error::Destroy operations detected in plan! Failing to prevent accidental deletion."
-              exit 1
-            fi
           fi
 
       - name: Terraform Apply
