@@ -1,8 +1,8 @@
 replicaCount: 2
 image:
-  repository: "httpd"
+  repository: 962765734677.dkr.ecr.us-east-1.amazonaws.com/eks-gitops/api-service
   pullPolicy: IfNotPresent
-  tag: "latest"
+  tag: "66aca7497449b9c6b403dee09e07026716976048"
 service:
   type: ClusterIP
   port: 80
