@@ -5,8 +5,8 @@
 replicaCount: 1  # KEDA manages this — starts at 0 when queue is empty
 
 image:
-  repository: ""    # Injected: <account>.dkr.ecr.<region>.amazonaws.com/eks-gitops/worker-service
-  tag: "latest"     # Updated by CI on every merge to main
+  repository: 962765734677.dkr.ecr.us-east-1.amazonaws.com/eks-gitops/worker-service
+  tag: "07f5bb5cb8738c3e32d7cf2f47d0fdcdf068d2fc"
   pullPolicy: IfNotPresent
 
 nameOverride: ""

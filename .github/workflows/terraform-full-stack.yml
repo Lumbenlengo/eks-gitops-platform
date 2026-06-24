@@ -191,4 +191,8 @@ jobs:
         run: kubectl apply -f argocd/projects/
 
       - name: Apply ArgoCD apps
+<<<<<<< HEAD
         run: kubectl apply -f argocd/apps/
+=======
+        run: kubectl apply -f argocd/apps/
+>>>>>>> 869cf10cab3e6e989ed1b69ba3b093d5ad9dd55c
