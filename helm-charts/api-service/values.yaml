@@ -1,9 +1,9 @@
 replicaCount: 2
 
 image:
-  repository: "962765734677.dkr.ecr.us-east-1.amazonaws.com/eks-gitops/api-service"
+  repository: 962765734677.dkr.ecr.us-east-1.amazonaws.com/eks-gitops/api-service
   pullPolicy: IfNotPresent
-  tag: "latest"
+  tag: "c7149a8311d2c959970530ddf5b0903b12dc6e09"
 
 service:
   type: ClusterIP
