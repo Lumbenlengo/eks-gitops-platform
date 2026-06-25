@@ -6,7 +6,7 @@ replicaCount: 1  # KEDA manages this — starts at 0 when queue is empty
 
 image:
   repository: 962765734677.dkr.ecr.us-east-1.amazonaws.com/eks-gitops/worker-service
-  tag: "d2db7760d5e248392e24336195f63fed8e980a7a"
+  tag: "6b74d5b76ff9955a27beb8bd3980511cdc824d0e"
   pullPolicy: IfNotPresent
 
 nameOverride: ""
