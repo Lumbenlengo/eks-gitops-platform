@@ -1,0 +1,130 @@
+name: "Terraform Destroy Layer"
+
+on:
+  workflow_dispatch:
+    inputs:
+      layer:
+        description: "Layer to destroy (must follow order: 03-addons → 02-platform → 01-foundation → 00-bootstrap)"
+        required: true
+        type: choice
+        options:
+          - 03-addons
+          - 02-platform
+          - 01-foundation
+          - 00-bootstrap
+      environment:
+        description: "Environment to destroy"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+      confirm:
+        description: "Type DESTROY to confirm you understand this is irreversible"
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: terraform-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: "Validate Inputs"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation string
+        run: |
+          if [ "${{ inputs.confirm }}" != "DESTROY" ]; then
+            echo "❌ Confirmation failed. You must type exactly: DESTROY"
+            echo "   You typed: '${{ inputs.confirm }}'"
+            exit 1
+          fi
+          echo "✅ Confirmation accepted"
+
+      - name: Warn about destroy order
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "⚠️  DESTRUCTION WARNING"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Environment : ${{ inputs.environment }}"
+          echo "Layer       : ${{ inputs.layer }}"
+          echo ""
+          echo "Required destroy order:"
+          echo "  1. 03-addons       ← destroy first"
+          echo "  2. 02-platform"
+          echo "  3. 01-foundation"
+          echo "  4. 00-bootstrap    ← destroy last"
+          echo ""
+          echo "Destroying out of order WILL cause failures."
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      - name: Safety pause
+        run: |
+          echo "⏳ Waiting 15 seconds before proceeding..."
+          echo "   Cancel this workflow now if this was a mistake."
+          sleep 15
+          echo "🚀 Proceeding with destroy..."
+
+  destroy:
+    name: "Destroy ${{ inputs.layer }} (${{ inputs.environment }})"
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    needs: validate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: terraform/layers/${{ inputs.layer }}
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=eks-gitops-platform-tfstate-${{ secrets.AWS_ACCOUNT_ID }}" \
+            -backend-config="key=${{ inputs.layer }}/terraform.tfstate" \
+            -backend-config="region=${{ secrets.AWS_REGION }}" \
+            -backend-config="dynamodb_table=eks-gitops-platform-tfstate-lock"
+
+      - name: Terraform Validate
+        working-directory: terraform/layers/${{ inputs.layer }}
+        run: terraform validate
+
+      - name: Terraform Plan Destroy
+        working-directory: terraform/layers/${{ inputs.layer }}
+        run: |
+          terraform plan -destroy \
+            -input=false \
+            -var-file="../../environments/${{ inputs.environment }}/terraform.tfvars" \
+            -out=destroyplan
+          echo "📋 Destroy plan above — review before it executes"
+
+      - name: Terraform Destroy
+        working-directory: terraform/layers/${{ inputs.layer }}
+        run: |
+          terraform apply \
+            -input=false \
+            -auto-approve \
+            destroyplan
+
+      - name: Destroy summary
+        if: always()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Destroy complete"
+          echo "Layer      : ${{ inputs.layer }}"
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Triggered by: ${{ github.actor }}"
+          echo "Run ID     : ${{ github.run_id }}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
