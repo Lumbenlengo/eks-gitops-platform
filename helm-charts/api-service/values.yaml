@@ -3,7 +3,7 @@ replicaCount: 2
 image:
   repository: 962765734677.dkr.ecr.us-east-1.amazonaws.com/eks-gitops/api-service
   pullPolicy: IfNotPresent
-  tag: "c7149a8311d2c959970530ddf5b0903b12dc6e09"
+  tag: "66aca7497449b9c6b403dee09e07026716976048"
 
 service:
   type: ClusterIP
@@ -16,12 +16,10 @@ serviceAccount:
   annotations:
     eks.amazonaws.com/role-arn: "arn:aws:iam::962765734677:role/eks-gitops-platform-api-service"
 
-podAnnotations: {}
-
 podSecurityContext:
   runAsNonRoot: true
-  runAsUser: 1000
-  fsGroup: 1000
+  runAsUser: 1001
+  fsGroup: 1001
 
 securityContext:
   allowPrivilegeEscalation: false
@@ -29,20 +27,9 @@ securityContext:
   capabilities:
     drop: ["ALL"]
 
-ingress:
-  enabled: true
-  className: alb
-  annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
-    alb.ingress.kubernetes.io/healthcheck-path: /health
-    alb.ingress.kubernetes.io/healthcheck-port: '8000'
-  hosts:
-    - host: ""
-      paths:
-        - path: /
-          pathType: Prefix
+env:
+  SQS_QUEUE_URL: "https://sqs.us-east-1.amazonaws.com/962765734677/order-processing-queue"
+  DYNAMODB_TABLE: "order-storage-table"
 
 livenessProbe:
   httpGet:
@@ -57,31 +44,3 @@ readinessProbe:
     port: 8000
   initialDelaySeconds: 5
   periodSeconds: 10
-
-resources:
-  limits:
-    cpu: 500m
-    memory: 512Mi
-  requests:
-    cpu: 100m
-    memory: 128Mi
-
-autoscaling:
-  enabled: true
-  minReplicas: 2
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 70
-
-topologySpreadConstraints:
-  - maxSkew: 1
-    topologyKey: topology.kubernetes.io/zone
-    whenUnsatisfiable: DoNotSchedule
-    labelSelector:
-      matchLabels:
-        app.kubernetes.io/name: api-service
-
-affinity: {}
-
-# Plain env vars injected into the container
-env:
-  SQS_QUEUE_URL: "https://sqs.us-east-1.amazonaws.com/962765734677/order-processing-queue"
