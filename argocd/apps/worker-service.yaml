@@ -8,17 +8,7 @@ spec:
   source:
     repoURL: https://github.com/Lumbenlengo/eks-gitops-platform.git
     targetRevision: HEAD
-    path: terraform/modules/addons/charts/worker-service
-    helm:
-      values: |
-        image:
-          repository: "962765734677.dkr.ecr.us-east-1.amazonaws.com/eks-gitops/worker-service"
-          tag: "latest"
-        serviceAccount:
-          annotations:
-            eks.amazonaws.com/role-arn: "arn:aws:iam::962765734677:role/eks-gitops-platform-worker-service"
-        env:
-          SQS_QUEUE_URL: "https://sqs.us-east-1.amazonaws.com/962765734677/eks-gitops-worker-queue"
+    path: helm-charts/worker-service
   destination:
     server: https://kubernetes.default.svc
     namespace: worker-service
@@ -26,3 +16,5 @@ spec:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+      - CreateNamespace=true 

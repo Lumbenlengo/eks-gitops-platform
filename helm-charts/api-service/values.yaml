@@ -1,9 +1,9 @@
 replicaCount: 2
 
 image:
-  repository: 962765734677.dkr.ecr.us-east-1.amazonaws.com/eks-gitops/api-service
+  repository: "962765734677.dkr.ecr.us-east-1.amazonaws.com/eks-gitops/api-service"
   pullPolicy: IfNotPresent
-  tag: "f06f1eeac1fda5f0aff4f31f3da601b938115df7"
+  tag: "66aca7497449b9c6b403dee09e07026716976048"
 
 service:
   type: ClusterIP
@@ -15,6 +15,8 @@ serviceAccount:
   name: "api-service-sa"
   annotations:
     eks.amazonaws.com/role-arn: "arn:aws:iam::962765734677:role/eks-gitops-platform-api-service"
+
+podAnnotations: {}
 
 podSecurityContext:
   runAsNonRoot: true
@@ -45,6 +47,20 @@ readinessProbe:
   initialDelaySeconds: 5
   periodSeconds: 10
 
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
 ingress:
   enabled: true
   className: alb
@@ -59,3 +75,13 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: api-service
+
+affinity: {} 
