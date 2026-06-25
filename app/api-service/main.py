@@ -5,6 +5,7 @@ FastAPI application that:
   - Exposes GET /items   (reads from DynamoDB)
   - Exposes POST /items  (writes to DynamoDB + publishes to SQS)
   - Exposes GET /metrics (Prometheus-compatible via prometheus_fastapi_instrumentator)
+  - Serves static dashboard at /
 
 All AWS credentials come from IRSA (IAM Roles for Service Accounts).
 """
@@ -21,6 +22,8 @@ from typing import Optional, List, Any
 import boto3
 from fastapi import FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles          # NEW
+from fastapi.responses import FileResponse          # NEW
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
 
@@ -45,7 +48,7 @@ SERVICE_VERSION = os.environ.get("SERVICE_VERSION", "unknown")
 # ---------------------------------------------------------------------------
 # AWS Clients
 # ---------------------------------------------------------------------------
-sqs      = boto3.client("sqs",       region_name=AWS_REGION)
+sqs      = boto3.client("sqs",        region_name=AWS_REGION)
 dynamodb = boto3.resource("dynamodb", region_name=AWS_REGION)
 table    = dynamodb.Table(DYNAMODB_TABLE)
 
@@ -59,6 +62,15 @@ app = FastAPI(
     docs_url="/docs" if ENVIRONMENT != "prod" else None,
     redoc_url=None,
 )
+
+# 1. NEW: Mount static files (CSS/JS/etc.)
+# This expects your static files to be inside the /app/static folder in the container
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# 2. NEW: Serve your main dashboard HTML at the root URL
+@app.get("/", include_in_schema=False)
+async def get_dashboard():
+    return FileResponse("static/ecommerce-storefront.html")
 
 app.add_middleware(
     CORSMiddleware,
@@ -226,7 +238,6 @@ async def create_item(item: ItemCreate) -> ItemResponse:
     except Exception as e:
         logger.warning("SQS publish failed for item %s: %s", item_id, str(e))
 
-    # db_item values are known Python types — access directly, no casting ambiguity
     return ItemResponse(
         id=item_id,
         name=item.name,

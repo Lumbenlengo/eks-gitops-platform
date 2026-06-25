@@ -29,6 +29,9 @@ COPY --from=builder /root/.local /home/appuser/.local
 # Copy application source
 COPY --chown=appuser:appgroup main.py .
 
+# NEW: Copy static dashboard assets
+COPY --chown=appuser:appgroup static/ ./static/
+
 USER appuser
 
 ENV PATH=/home/appuser/.local/bin:$PATH \
