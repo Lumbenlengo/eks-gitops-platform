@@ -1,15 +1,34 @@
 replicaCount: 2
+
 image:
-  repository: 962765734677.dkr.ecr.us-east-1.amazonaws.com/eks-gitops/api-service
+  repository: "962765734677.dkr.ecr.us-east-1.amazonaws.com/eks-gitops/api-service"
   pullPolicy: IfNotPresent
-  tag: "66aca7497449b9c6b403dee09e07026716976048"
+  tag: "latest"
+
 service:
   type: ClusterIP
-  port: 80
-  targetPort: 80
+  port: 8000
+  targetPort: 8000
+
 serviceAccount:
   create: true
   name: "api-service-sa"
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::962765734677:role/eks-gitops-platform-api-service"
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
 ingress:
   enabled: true
   className: alb
@@ -17,27 +36,52 @@ ingress:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
-    alb.ingress.kubernetes.io/healthcheck-path: /
-    alb.ingress.kubernetes.io/healthcheck-port: '80'
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-port: '8000'
   hosts:
     - host: ""
       paths:
         - path: /
           pathType: Prefix
+
 livenessProbe:
   httpGet:
-    path: /
-    port: 80
+    path: /health
+    port: 8000
+  initialDelaySeconds: 10
+  periodSeconds: 15
+
 readinessProbe:
   httpGet:
-    path: /
-    port: 80
+    path: /health
+    port: 8000
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
 resources:
   limits:
-    cpu: 100m
-    memory: 128Mi
+    cpu: 500m
+    memory: 512Mi
   requests:
     cpu: 100m
     memory: 128Mi
+
 autoscaling:
-  enabled: false
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: api-service
+
+affinity: {}
+
+# Plain env vars injected into the container
+env:
+  SQS_QUEUE_URL: "https://sqs.us-east-1.amazonaws.com/962765734677/order-processing-queue"

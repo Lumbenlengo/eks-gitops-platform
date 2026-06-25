@@ -55,7 +55,7 @@ module "addons" {
   account_id                  = data.aws_caller_identity.current.account_id
   ecr_api_service_repo        = var.ecr_api_service_repo
   ecr_worker_service_repo     = var.ecr_worker_service_repo
-  cluster_autoscaler_role_arn = data.terraform_remote_state.platform.outputs.worker_service_role_arn
+  cluster_autoscaler_role_arn = data.terraform_remote_state.platform.outputs.cluster_autoscaler_role_arn
 }
 
 # --- Namespaces ---

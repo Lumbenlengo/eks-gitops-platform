@@ -43,3 +43,8 @@ output "dynamodb_table_name" {
 output "configure_kubectl" {
   value = "aws eks update-kubeconfig --region us-east-1 --name ${module.eks.cluster_name}"
 }
+
+output "cluster_autoscaler_role_arn" {
+  description = "IAM role ARN for the Cluster Autoscaler"
+  value       = module.irsa.cluster_autoscaler_role_arn
+}
