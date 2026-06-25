@@ -4,7 +4,7 @@ environment  = "prod"
 aws_region   = "us-east-1"
 
 # EKS Cluster Configuration
-cluster_version    = "1.30"
+cluster_version    = "1.31"
 node_capacity_type = "ON_DEMAND"
 node_instance_type = "t3.medium"
 
