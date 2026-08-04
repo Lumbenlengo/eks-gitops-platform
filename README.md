@@ -44,37 +44,11 @@ There is also a small static demo UI under `app/api-service/static/` (an ops das
 
 ## Architecture
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/95b0345f-d961-40c2-adf1-078078bfa72b" alt="Production-Grade Amazon EKS GitOps Platform - Architecture" style="width: 100%; max-width: 1000px; height: auto;" />
+</p>
+
 ```
-                         AWS Account
-                         ---------------------------------------------
-GitHub Actions   OIDC    github-actions-terraform role
-GitHub Actions   OIDC    github-actions-eks-gitops role
-
-                         VPC (10.0.0.0/16)
-                         -------------------   -------------------
-Internet                 Public subnets        Private subnets
-   |                      (3 AZs)                (3 AZs)
-   v                      ALB (HTTPS)   -->     EKS nodes (t3.medium)
-Route53                   NAT GW x3              ASG 2 to 10
-api.lumbenlengo.com                              api-service (HPA)
-   |                                              worker-service (KEDA, scales to 0)
-ACM certificate
-
-                         SQS  <-- api-service
-                            \--> worker-service --> DynamoDB
-
-                         ECR x2   Secrets Manager   CloudWatch
-                         ---------------------------------------------
-
-GitOps loop:
-push to main  ->  CI builds image and updates Helm values.yaml
-              ->  ArgoCD detects the diff
-              ->  applies the Helm release
-              ->  rolling update
-              ->  health check
-```
-
-A rendered version of this diagram lives at `docs/architecture.png`.
 
 ## How a deploy happens
 
@@ -201,6 +175,10 @@ kubectl describe scaledobject worker-service -n worker-service
 ```
 
 ## Design decisions
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/35e7d945-b97d-446f-b007-426e8acb08c4" alt="Diagrama EKS GitOps" style="width: 100%; max-width: 1000px; height: auto;" />
+</p>
 
 Every non obvious technical choice in this repository is written up as an ADR, including what was rejected and why:
 
