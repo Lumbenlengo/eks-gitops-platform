@@ -195,4 +195,4 @@ EKS Auto Mode instead of self managed node groups. Blue or green deployments for
 
 Built and maintained by Patrício Lumbe.
 
-[lumbenlengo.com](https://lumbenlengo.com) | [LinkedIn](https://linkedin.com/in/Lumbenlengo) | [Malt](https://malt.fr/profile/Lumbenlengo)
+[lumbenlengo.com](https://lumbenlengo.com) | [LinkedIn](https://linkedin.com/in/Lumbenlengo)
