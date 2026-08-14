@@ -12,6 +12,14 @@ on:
       action:
         type: string
         default: "apply"
+    # EXPOSE OUTPUTS TO CALLING WORKFLOW
+    outputs:
+      ecr_push_role_arn:
+        description: "IAM Role ARN for ECR Push (generated in 00-bootstrap layer)"
+        value: ${{ jobs.terraform.outputs.ecr_push_role_arn }}
+      cluster_name:
+        description: "EKS Cluster Name (generated in 02-platform layer)"
+        value: ${{ jobs.terraform.outputs.cluster_name }}
 
 jobs:
   terraform:
@@ -22,15 +30,27 @@ jobs:
       id-token: write
       contents: read
 
+    # MAP STEP OUTPUTS TO JOB OUTPUTS
+    outputs:
+      ecr_push_role_arn: ${{ steps.tf-outputs.outputs.ecr_push_role_arn }}
+      cluster_name: ${{ steps.tf-outputs.outputs.cluster_name }}
+
+    # Global Mapping of Secrets to TF_VAR_
+    env:
+      TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+      TF_VAR_api_secret_key: ${{ secrets.API_SECRET_KEY }}
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
 
       - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
 
       - name: Terraform Init
         working-directory: terraform/layers/${{ inputs.layer }}
@@ -38,21 +58,40 @@ jobs:
           terraform init -input=false \
             -backend-config="bucket=eks-gitops-platform-tfstate-${{ secrets.AWS_ACCOUNT_ID }}" \
             -backend-config="key=${{ inputs.tf_key }}" \
-            -backend-config="region=${{ secrets.AWS_REGION }}"
+            -backend-config="region=${{ secrets.AWS_REGION || 'us-east-1' }}"
 
       - name: Terraform Plan
         working-directory: terraform/layers/${{ inputs.layer }}
         run: |
           TFVARS_PATH="${{ github.workspace }}/terraform/environments/prod/terraform.tfvars"
+          VAR_FILE_ARG=""
+
+          if [ -f "$TFVARS_PATH" ]; then
+            VAR_FILE_ARG="-var-file=$TFVARS_PATH"
+          fi
 
           if [ "${{ inputs.action }}" == "destroy" ]; then
             terraform plan -destroy -lock-timeout=10m -input=false -out=tfplan \
-              -compact-warnings -var-file="$TFVARS_PATH"
+              -compact-warnings $VAR_FILE_ARG
           else
             terraform plan -lock-timeout=10m -input=false -out=tfplan \
-              -compact-warnings -var-file="$TFVARS_PATH"
+              -compact-warnings $VAR_FILE_ARG
           fi
 
       - name: Terraform Apply
         working-directory: terraform/layers/${{ inputs.layer }}
         run: terraform apply -input=false -auto-approve tfplan
+
+      # Extract Terraform outputs and export to GITHUB_OUTPUT
+      - name: Export Terraform Outputs
+        id: tf-outputs
+        if: ${{ inputs.action != 'destroy' }}
+        working-directory: terraform/layers/${{ inputs.layer }}
+        run: |
+          if terraform output -json > outputs.json 2>/dev/null; then
+            ROLE_ARN=$(jq -r '.ecr_push_role_arn.value // empty' outputs.json)
+            CLUSTER_NAME=$(jq -r '.cluster_name.value // empty' outputs.json)
+
+            echo "ecr_push_role_arn=$ROLE_ARN" >> $GITHUB_OUTPUT
+            echo "cluster_name=$CLUSTER_NAME" >> $GITHUB_OUTPUT
+          fi

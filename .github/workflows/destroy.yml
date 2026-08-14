@@ -40,16 +40,16 @@ jobs:
       - name: Check confirmation string
         run: |
           if [ "${{ inputs.confirm }}" != "DESTROY" ]; then
-            echo "❌ Confirmation failed. You must type exactly: DESTROY"
+            echo " Confirmation failed. You must type exactly: DESTROY"
             echo "   You typed: '${{ inputs.confirm }}'"
             exit 1
           fi
-          echo "✅ Confirmation accepted"
+          echo " Confirmation accepted"
 
       - name: Warn about destroy order
         run: |
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "⚠️  DESTRUCTION WARNING"
+          echo "  DESTRUCTION WARNING"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "Environment : ${{ inputs.environment }}"
           echo "Layer       : ${{ inputs.layer }}"
@@ -65,10 +65,10 @@ jobs:
 
       - name: Safety pause
         run: |
-          echo "⏳ Waiting 15 seconds before proceeding..."
+          echo " Waiting 15 seconds before proceeding..."
           echo "   Cancel this workflow now if this was a mistake."
           sleep 15
-          echo "🚀 Proceeding with destroy..."
+          echo " Proceeding with destroy..."
 
   destroy:
     name: "Destroy ${{ inputs.layer }} (${{ inputs.environment }})"

@@ -15,7 +15,7 @@ module "networking" {
   # Use the data source defined in data.tf
   azs = slice(data.aws_availability_zones.available.names, 0, 3)
 
-  enable_nat_gateway     = true
-  single_nat_gateway     = true
+  enable_nat_gateway     = false
+  single_nat_gateway     = false
   one_nat_gateway_per_az = false
 }

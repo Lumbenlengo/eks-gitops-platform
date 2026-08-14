@@ -3,6 +3,11 @@ name: "Full Stack Deployment"
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
   workflow_dispatch:
     inputs:
       action:
@@ -21,6 +26,9 @@ permissions:
 concurrency:
   group: terraform-prod
   cancel-in-progress: false
+
+env:
+  AWS_REGION: "us-east-1"
 
 jobs:
   lint:
@@ -73,15 +81,16 @@ jobs:
 
   docker-api:
     name: "Docker — api-service"
-    needs: [addons]
+    needs: [bootstrap, addons]
+    if: ${{ github.event.inputs.action != 'destroy' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ needs.bootstrap.outputs.ecr_push_role_arn || secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to ECR
         id: login-ecr
@@ -90,7 +99,7 @@ jobs:
       - name: Build & Push api-service
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPO: ${{ secrets.ECR_REPOSITORY_API }}
+          REPO: ${{ secrets.ECR_REPOSITORY_API || 'api-service' }}
           TAG: ${{ github.sha }}
         run: |
           docker build -t $REGISTRY/$REPO:$TAG -t $REGISTRY/$REPO:latest app/api-service
@@ -100,11 +109,11 @@ jobs:
       - name: Update api-service Helm values
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPO: ${{ secrets.ECR_REPOSITORY_API }}
+          REPO: ${{ secrets.ECR_REPOSITORY_API || 'api-service' }}
           TAG: ${{ github.sha }}
         run: |
           sed -i "s|repository:.*|repository: $REGISTRY/$REPO|" helm-charts/api-service/values.yaml
-          sed -i "s|tag:.*|tag: \"$TAG\"|"                      helm-charts/api-service/values.yaml
+          sed -i "s|tag:.*|tag: \"$TAG\"|"                       helm-charts/api-service/values.yaml
 
       - name: Commit Helm values
         run: |
@@ -112,22 +121,23 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add helm-charts/api-service/values.yaml
           git diff --staged --quiet || (
-            git commit -m "chore: api-service image → ${{ github.sha }}" &&
+            git commit -m "day 4: update api-service image → ${{ github.sha }}" &&
             git pull --rebase origin main &&
             git push
           )
 
   docker-worker:
     name: "Docker — worker-service"
-    needs: [docker-api]  
+    needs: [bootstrap, docker-api]
+    if: ${{ github.event.inputs.action != 'destroy' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ needs.bootstrap.outputs.ecr_push_role_arn || secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to ECR
         id: login-ecr
@@ -136,7 +146,7 @@ jobs:
       - name: Build & Push worker-service
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPO: ${{ secrets.ECR_REPOSITORY_WORKER }}
+          REPO: ${{ secrets.ECR_REPOSITORY_WORKER || 'worker-service' }}
           TAG: ${{ github.sha }}
         run: |
           docker build -t $REGISTRY/$REPO:$TAG -t $REGISTRY/$REPO:latest app/worker-service
@@ -146,11 +156,11 @@ jobs:
       - name: Update worker-service Helm values
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPO: ${{ secrets.ECR_REPOSITORY_WORKER }}
+          REPO: ${{ secrets.ECR_REPOSITORY_WORKER || 'worker-service' }}
           TAG: ${{ github.sha }}
         run: |
           sed -i "s|repository:.*|repository: $REGISTRY/$REPO|" helm-charts/worker-service/values.yaml
-          sed -i "s|tag:.*|tag: \"$TAG\"|"                      helm-charts/worker-service/values.yaml
+          sed -i "s|tag:.*|tag: \"$TAG\"|"                       helm-charts/worker-service/values.yaml
 
       - name: Commit Helm values
         run: |
@@ -158,28 +168,29 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add helm-charts/worker-service/values.yaml
           git diff --staged --quiet || (
-            git commit -m "chore: worker-service image → ${{ github.sha }}" &&
+            git commit -m "day 4: update worker-service image → ${{ github.sha }}" &&
             git pull --rebase origin main &&
             git push
           )
 
   argocd-sync:
     name: "ArgoCD Sync"
-    needs: [docker-worker] 
+    needs: [bootstrap, platform, docker-worker]
+    if: ${{ github.event.inputs.action != 'destroy' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ needs.bootstrap.outputs.ecr_push_role_arn || secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Get EKS kubeconfig
         run: |
           aws eks update-kubeconfig \
-            --name ${{ secrets.EKS_CLUSTER_NAME }} \
-            --region ${{ secrets.AWS_REGION }}
+            --name ${{ needs.platform.outputs.cluster_name || secrets.EKS_CLUSTER_NAME }} \
+            --region ${{ env.AWS_REGION }}
 
       - name: Apply ArgoCD projects
         run: kubectl apply -f argocd/projects/

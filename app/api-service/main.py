@@ -64,10 +64,10 @@ app = FastAPI(
 )
 
 # 1. NEW: Mount static files (CSS/JS/etc.)
-# This expects your static files to be inside the /app/static folder in the container
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# 2. NEW: Serve your main dashboard HTML at the root URL
+# 2. NEW: Serve my main dashboard HTML at the root URL
 @app.get("/", include_in_schema=False)
 async def get_dashboard():
     return FileResponse("static/ecommerce-storefront.html")

@@ -1,7 +1,7 @@
 
 # Project Metadata
 project_name = "eco-order-system"
-environment  = "prod"
+environment  = "dev"
 region       = "us-east-1"
 account_id   = "962765734677"
 
@@ -28,7 +28,7 @@ argocd_namespace    = "argocd"
 # Resource Tagging
 tags = {
   Project     = "eks-gitops-platform"
-  Environment = "prod"
+  Environment = "dev"
   ManagedBy   = "terraform"
   Owner       = "Patricio-Lumbenlengo"
   Mission     = "Retail-Order-Processor"
