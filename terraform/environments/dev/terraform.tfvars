@@ -3,7 +3,7 @@
 project_name = "eco-order-system"
 environment  = "dev"
 region       = "us-east-1"
-account_id   = "962765734677"
+account_id   = "979054355604"
 
 # EKS Cluster Configuration
 cluster_version    = "1.30"

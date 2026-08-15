@@ -1,7 +1,7 @@
 replicaCount: 2
 
 image:
-  repository: 962765734677.dkr.ecr.us-east-1.amazonaws.com/eks-gitops/api-service
+  repository: 979054355604.dkr.ecr.us-east-1.amazonaws.com/eks-gitops/api-service
   pullPolicy: IfNotPresent
   tag: "722f20920cced170f2521ba5ad8021f788efe88e"
 
@@ -14,7 +14,7 @@ serviceAccount:
   create: true
   name: "api-service-sa"
   annotations:
-    eks.amazonaws.com/role-arn: "arn:aws:iam::962765734677:role/eks-gitops-platform-api-service"
+    eks.amazonaws.com/role-arn: "arn:aws:iam::979054355604:role/eks-gitops-platform-api-service"
 
 podAnnotations: {}
 
@@ -30,7 +30,7 @@ securityContext:
     drop: ["ALL"]
 
 env:
-  SQS_QUEUE_URL: "https://sqs.us-east-1.amazonaws.com/962765734677/order-processing-queue"
+  SQS_QUEUE_URL: "https://sqs.us-east-1.amazonaws.com/979054355604/order-processing-queue"
   DYNAMODB_TABLE: "order-storage-table"
 
 livenessProbe:
