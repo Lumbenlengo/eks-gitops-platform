@@ -309,7 +309,10 @@ resource "helm_release" "external_secrets" {
     value = kubernetes_service_account.external_secrets.metadata[0].name
   }
 
-  depends_on = [kubernetes_service_account.external_secrets]
+  depends_on = [
+    kubernetes_service_account.external_secrets,
+    helm_release.alb_controller
+  ]
 }
 
 # ---------------------------------------------------------------------------
@@ -380,6 +383,10 @@ resource "helm_release" "keda" {
     name  = "podIdentity.provider"
     value = "aws"
   }
+
+  depends_on = [
+    helm_release.alb_controller
+  ]
 }
 
 # ---------------------------------------------------------------------------
@@ -417,4 +424,8 @@ resource "helm_release" "cluster_autoscaler" {
     name  = "extraArgs.skip-nodes-with-system-pods"
     value = "false"
   }
+
+  depends_on = [
+    helm_release.alb_controller
+  ]
 }

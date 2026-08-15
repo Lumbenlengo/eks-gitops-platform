@@ -4,11 +4,11 @@ variable "aws_region" {
 }
 variable "ecr_api_service_repo" {
   type    = string
-  default = "eks-gitops/api-service"
+  default = "api-service"
 }
 variable "ecr_worker_service_repo" {
   type    = string
-  default = "eks-gitops/worker-service"
+  default = "worker-service"
 }
 variable "tags" {
   type = map(string)
