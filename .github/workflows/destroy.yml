@@ -95,7 +95,7 @@ jobs:
             -backend-config="bucket=eks-git-ops-platform-tfstate-${{ secrets.AWS_ACCOUNT_ID }}" \
             -backend-config="key=${{ inputs.layer }}/terraform.tfstate" \
             -backend-config="region=${{ secrets.AWS_REGION }}" \
-            -backend-config="dynamodb_table=eks-git-ops-platform-tfstate-lock"
+            -backend-config="dynamodb_table=eks-gitops-platform-tfstate-lock"
 
       - name: Terraform Validate
         working-directory: terraform/layers/${{ inputs.layer }}

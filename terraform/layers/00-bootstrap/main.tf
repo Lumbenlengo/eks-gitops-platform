@@ -19,7 +19,7 @@ provider "aws" {
 
 
 resource "aws_dynamodb_table" "tflock" {
-  name         = "eks-git-ops-platform-tfstate-lock"
+  name         = "eks-gitops-platform-tfstate-lock"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "LockID"
   attribute {
