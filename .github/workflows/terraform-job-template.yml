@@ -12,7 +12,7 @@ on:
       action:
         type: string
         default: "apply"
-    # EXPOSE OUTPUTS TO CALLING WORKFLOW
+   
     outputs:
       ecr_push_role_arn:
         description: "IAM Role ARN for ECR Push (generated in 00-bootstrap layer)"
@@ -56,7 +56,7 @@ jobs:
         working-directory: terraform/layers/${{ inputs.layer }}
         run: |
           terraform init -input=false \
-            -backend-config="bucket=eks-gitops-platform-tfstate-${{ secrets.AWS_ACCOUNT_ID }}" \
+            -backend-config="bucket=eks-gitops-platform-tfstate-979054355604" \
             -backend-config="key=${{ inputs.tf_key }}" \
             -backend-config="region=${{ secrets.AWS_REGION || 'us-east-1' }}"
 
