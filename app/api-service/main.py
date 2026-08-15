@@ -72,6 +72,10 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 async def get_dashboard():
     return FileResponse("static/ecommerce-storefront.html")
 
+@app.get("/ops", include_in_schema=False)
+async def get_ops_center():
+    return FileResponse("static/ecommerce-ops-center.html")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
