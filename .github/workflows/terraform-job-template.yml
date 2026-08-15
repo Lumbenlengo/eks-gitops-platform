@@ -12,7 +12,7 @@ on:
       action:
         type: string
         default: "apply"
-   
+    # EXPOSE OUTPUTS TO CALLING WORKFLOW
     outputs:
       ecr_push_role_arn:
         description: "IAM Role ARN for ECR Push (generated in 00-bootstrap layer)"
@@ -56,7 +56,7 @@ jobs:
         working-directory: terraform/layers/${{ inputs.layer }}
         run: |
           terraform init -input=false \
-            -backend-config="bucket=eks-gitops-platform-tfstate-979054355604" \
+            -backend-config="bucket=eks-git-ops-platform-tfstate-979054355604" \
             -backend-config="key=${{ inputs.tf_key }}" \
             -backend-config="region=${{ secrets.AWS_REGION || 'us-east-1' }}"
 
@@ -88,7 +88,7 @@ jobs:
         if: ${{ inputs.action != 'destroy' }}
         working-directory: terraform/layers/${{ inputs.layer }}
         run: |
-          if terraform output -json > outputs.json 2>/dev/null; then
+          if terraform output -json > outputs.json 2>/devnull; then
             ROLE_ARN=$(jq -r '.ecr_push_role_arn.value // empty' outputs.json)
             CLUSTER_NAME=$(jq -r '.cluster_name.value // empty' outputs.json)
 
